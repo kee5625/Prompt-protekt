@@ -8,7 +8,10 @@
     "start": "npm run build && node dist/huggingface.js",
     "test": "npm run build && node dist/test.js",
     "dev": "ts-node huggingface.ts",
-    "dev:test": "ts-node test.ts"
+    "dev:test": "ts-node test.ts",
+    "server": "ts-node server.ts",
+    "server:build": "npm run build && node dist/server.js",
+    "test:server": "ts-node test-server.ts"
   },
   "dependencies": {
     "@huggingface/inference": "^4.13.2",
