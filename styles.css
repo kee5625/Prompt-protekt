@@ -1,0 +1,269 @@
+/* Typing Indicator */
+#typing-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  border-radius: 5px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  z-index: 10000;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  transition: opacity 0.3s;
+  max-width: 300px;
+  word-wrap: break-word;
+}
+
+/* Prompt Protekt Container */
+#prompt-protekt-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+  font-family: Arial, sans-serif;
+}
+
+/* Toggle Button */
+#prompt-protekt-toggle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  transition: all 0.3s;
+}
+
+#prompt-protekt-toggle:hover {
+  transform: scale(1.1);
+}
+
+/* Popup Panel */
+#prompt-protekt-popup {
+  display: none;
+  position: absolute;
+  bottom: 60px;
+  right: 0;
+  width: 300px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  overflow: hidden;
+}
+
+/* Tab Buttons Container */
+#prompt-protekt-popup .tab-buttons {
+  display: flex;
+  background-color: #f1f1f1;
+  border-bottom: 2px solid #ddd;
+}
+
+/* Tab Button */
+.tab-button {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  background-color: #f1f1f1;
+  color: #333;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: background-color 0.3s;
+}
+
+.tab-button.active {
+  background-color: #4CAF50;
+  color: white;
+}
+
+/* Tab Content */
+.tab-content {
+  display: none;
+  padding: 15px;
+  color: #333;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Alerts Content */
+.tab-content.alerts {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Alert Item */
+.alert-item {
+  background-color: #fff3cd;
+  border-left: 3px solid #ffc107;
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.alert-item:hover {
+  background-color: #ffe69c;
+}
+
+.alert-item .alert-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.alert-item .alert-details {
+  flex: 1;
+}
+
+.alert-item .found-text {
+  color: #856404;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.alert-item .found-value {
+  background: #fff;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.alert-item .count-badge {
+  background: #ff5722;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  margin-left: 5px;
+}
+
+.alert-item .replace-text {
+  color: #666;
+  font-size: 11px;
+  margin-top: 3px;
+}
+
+.alert-item .replace-value {
+  background: #4CAF50;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* Replace Button */
+.replace-btn {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: bold;
+  transition: background-color 0.3s;
+}
+
+.replace-btn:hover {
+  background-color: #45a049;
+}
+
+.replace-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+/* Category Header */
+.category-header {
+  margin: 0 0 8px 0;
+  color: #333;
+  text-transform: capitalize;
+  font-size: 14px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 5px;
+}
+
+.category-section {
+  margin-bottom: 15px;
+}
+
+/* Alert Success State */
+.alert-item.success {
+  background-color: #d4edda;
+  border-left-color: #28a745;
+}
+
+/* Toggle Container */
+.toggle-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border-radius: 5px;
+}
+
+.toggle-label {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 24px;
+}
+
+.toggle-slider-button {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #4CAF50;
+}
+
+.toggle-switch input:checked + .toggle-slider .toggle-slider-button {
+  transform: translateX(26px);
+}
+
+/* Empty State */
+.empty-state {
+  margin: 0;
+  color: #666;
+}
