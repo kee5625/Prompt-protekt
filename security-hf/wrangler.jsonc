@@ -1,0 +1,7 @@
+{
+  "name": "security-hf",
+  "main": "src/worker.js",
+  "workers_dev": true,
+  "preview_urls": true,
+  "compatibility_date": "2024-01-01"
+}
