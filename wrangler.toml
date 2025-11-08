@@ -1,4 +1,4 @@
-name = "prompt-protekt-worker"
+name = "security-hf"
 main = "worker.ts"
 compatibility_date = "2024-01-01"
 
