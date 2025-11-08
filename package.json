@@ -1,9 +1,22 @@
 {
+  "name": "prompt-protekt",
+  "version": "1.0.0",
+  "description": "Personal information detection using Hugging Face piiranha model",
+  "main": "dist/huggingface.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && node dist/huggingface.js",
+    "test": "npm run build && node dist/test.js",
+    "dev": "ts-node huggingface.ts",
+    "dev:test": "ts-node test.ts"
+  },
   "dependencies": {
-    "@huggingface/inference": "^4.13.2"
+    "@huggingface/inference": "^4.13.2",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }
 }
