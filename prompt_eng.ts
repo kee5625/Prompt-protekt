@@ -1,118 +1,78 @@
-// A simple, single-function example for a prompt engineering tool using the Gemini API.
-
 /**
- * Refines a given prompt string using the Gemini API.
- *
- * @param {string} promptToEngineer The user's original prompt string to be refined.
- * @returns {Promise<string>} A promise that resolves to the new, AI-engineered prompt string.
+ * Simple prompt engineering function using Gemini AI
  */
-async function engineerPrompt(promptToEngineer: string): Promise<string> {
-    // --- Configuration ---
-    // !! IMPORTANT: Replace with your actual API key.
-    // For production, this should be handled securely (e.g., environment variables)
-    // and not hardcoded or shared.
-    const apiKey = "AIzaSyC-MXCTadk3zm4sO2kgttQgrymiI4lfpzA"; // Per your request, set as a variable. Leave empty string.
-    
-    const model = 'gemini-2.5-flash-preview-09-2025';
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-    // --- System Instruction ---
-    // This is the core "meta-prompt." It tells the AI *how* to modify the user's prompt.
-    // You can get very creative and specific here.
-    const systemPrompt = `You are an expert prompt engineer. Your task is to take the user's input prompt and refine it to be clearer, more concise, and more effective for a large language model.
-    
-    Follow these rules:
-    1.  Analyze the user's original intent.
-    2.  Add specificity, context, and constraints where appropriate.
-    3.  Define the desired format or persona for the output if implied.
-    4.  Ensure the prompt is unambiguous.
-    5.  Return *only* the new, refined prompt string and nothing else. Do not add any conversational text like "Here is the refined prompt:".`;
+import * as dotenv from 'dotenv';
 
-    // --- API Payload ---
-    const payload = {
-        contents: [{
-            parts: [{ text: promptToEngineer }] // The user's prompt
-        }],
-        systemInstruction: {
-            parts: [{ text: systemPrompt }] // The "meta-prompt"
-        },
-        // Optional: Add generationConfig settings if needed, e.g., temperature
-        // generationConfig: {
-        //   temperature: 0.7,
-        // }
-    };
+// Load environment variables
+dotenv.config();
 
-    // --- Define an interface for the expected API response ---
-    interface GeminiApiResponse {
-        candidates?: Array<{
-            content?: {
-                parts?: Array<{
-                    text?: string;
-                }>;
-            };
-        }>;
+async function promptGemini(
+  apiKey: string,
+  prompt: string
+): Promise<string> {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
+
+  const requestBody = {
+    contents: [{ parts: [{ text: prompt }] }]
+  };
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Gemini API Error: ${response.status} - ${JSON.stringify(errorData)}`);
     }
 
-    // --- API Call & Error Handling ---
-    try {
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            const errorBody = await response.text();
-            throw new Error(`API request failed with status ${response.status}: ${errorBody}`);
-        }
-
-        // Explicitly type the result from response.json() using our interface
-        const result: GeminiApiResponse = await response.json();
-
-        // --- Response Parsing ---
-        const engineeredPrompt = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-        if (engineeredPrompt) {
-            // Clean up any potential markdown or extra quotes
-            return engineeredPrompt.trim().replace(/^"(.*)"$/, '$1');
-        } else {
-            console.error('Invalid response structure from API:', JSON.stringify(result, null, 2));
-            throw new Error('Could not parse the engineered prompt from the API response.');
-        }
-
-    } catch (error) {
-        let errorMessage = "An unknown error occurred";
-        // Check if the error is an actual Error object
-        if (error instanceof Error) {
-            errorMessage = error.message;
-        }
-        console.error('Error during prompt engineering:', error);
-        // Fallback: return original prompt or throw error
-        throw new Error(`Failed to engineer prompt: ${errorMessage}`);
+    const data: any = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!text) {
+      throw new Error('No text generated in response');
     }
+
+    return text;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to call Gemini API: ${error.message}`);
+    }
+    throw error;
+  }
 }
 
-// --- Example Usage (uncomment to run in a Node.js environment) ---
+// ============================================
+// TEST SECTION
+// ============================================
 
-(async () => {
-    const originalPrompt = "tell me about dogs";
-    
-    try {
-        console.log(`Original prompt: "${originalPrompt}"`);
-        const newPrompt = await engineerPrompt(originalPrompt);
-        console.log('---');
-        console.log(`Engineered prompt: "${newPrompt}"`);
+async function runTest() {
+  // REPLACE THIS WITH YOUR ACTUAL API KEY
+  const API_KEY = process.env.GEMINI_API_KEY;
+  
+  console.log('🚀 Testing Gemini Prompt Function...\n');
 
-        // Example 2
-        const originalPrompt2 = "how to write js function";
-        console.log(`\nOriginal prompt: "${originalPrompt2}"`);
-        const newPrompt2 = await engineerPrompt(originalPrompt2);
-        console.log('---');
-        console.log(`Engineered prompt: "${newPrompt2}"`);
+  try {
+    // Test 1: Simple prompt
+    console.log('Test 1: Simple prompt');
+    const response1 = await promptGemini(API_KEY, 'Say "Hello from Gemini!" and nothing else');
+    console.log('✅ Response:', response1);
+    console.log('');
 
-    } catch (error) {
-        console.error('Failed to run example:');
-    }
-})();
+    // Test 2: Another prompt
+    console.log('Test 2: Haiku test');
+    const response2 = await promptGemini(API_KEY, 'Write a haiku about coding');
+    console.log('✅ Response:', response2);
+    console.log('');
+
+    console.log('🎉 All tests passed!');
+  } catch (error) {
+    console.error('❌ Error:', error);
+  }
+}
+
+// Run the test
+runTest();
