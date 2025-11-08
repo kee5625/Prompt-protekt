@@ -1,5 +1,11 @@
 .env
 venv
+process.env
+
+node_modules
+
+dist
+venv
 
 node_modules
 
