@@ -52,6 +52,10 @@ async function promptGemini(
 async function runTest() {
   // REPLACE THIS WITH YOUR ACTUAL API KEY
   const API_KEY = process.env.GEMINI_API_KEY;
+
+  if (!API_KEY) {
+    throw new Error('GEMINI_API_KEY environment variable is not set.');
+  }
   
   console.log('🚀 Testing Gemini Prompt Function...\n');
 
