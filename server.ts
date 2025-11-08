@@ -13,6 +13,21 @@ interface NERMappings {
   dates: Record<string, string>;
   ssn: Record<string, string>;
   creditCards: Record<string, string>;
+  accountNumbers: Record<string, string>;
+  buildingNumbers: Record<string, string>;
+  cities: Record<string, string>;
+  datesOfBirth: Record<string, string>;
+  driverLicenses: Record<string, string>;
+  givenNames: Record<string, string>;
+  surnames: Record<string, string>;
+  idCards: Record<string, string>;
+  passwords: Record<string, string>;
+  socialNumbers: Record<string, string>;
+  streets: Record<string, string>;
+  taxNumbers: Record<string, string>;
+  telephoneNumbers: Record<string, string>;
+  usernames: Record<string, string>;
+  zipCodes: Record<string, string>;
 }
 
 interface RequestBody {
@@ -50,6 +65,28 @@ function generateAnonymizedLabel(entityType: string, index: number, value: strin
     'DATE': (idx) => '[Date Redacted]',
     'US_SSN': (idx) => 'XXX-XX-XXXX',
     'CREDIT_CARD': (idx) => 'XXXX-XXXX-XXXX-XXXX',
+    'ACCOUNTNUM': (idx) => `ACCT-${String(idx + 1).padStart(8, 'X')}`,
+    'BUILDINGNUM': (idx) => `[Building ${String.fromCharCode(65 + idx)}]`,
+    'CREDITCARDNUMBER': (idx) => 'XXXX-XXXX-XXXX-XXXX',
+    'DATEOFBIRTH': (idx) => '[DOB Redacted]',
+    'DRIVERLICENSENUM': (idx) => `DL-XXXXXXXX`,
+    'GIVENNAME': (idx) => `FirstName${String.fromCharCode(65 + idx)}`,
+    'SURNAME': (idx) => `LastName${String.fromCharCode(65 + idx)}`,
+    'IDCARDNUM': (idx) => `ID-XXXXXXXX`,
+    'PASSWORD': (idx) => '[PASSWORD REDACTED]',
+    'SOCIALNUM': (idx) => 'XXX-XX-XXXX',
+    'STREET': (idx) => '[Street Redacted]',
+    'TAXNUM': (idx) => `TAX-XXXXXXXX`,
+    'TELEPHONENUM': (idx) => {
+      if (value.startsWith('+')) {
+        return `+X-XXX-XXX-${String(idx + 1).padStart(4, '0')}`;
+      } else if (value.startsWith('(')) {
+        return `(XXX) XXX-${String(idx + 1).padStart(4, '0')}`;
+      }
+      return `XXX-XXX-${String(idx + 1).padStart(4, '0')}`;
+    },
+    'USERNAME': (idx) => `user${String(idx + 1).padStart(4, '0')}`,
+    'ZIPCODE': (idx) => 'XXXXX',
   };
 
   const generator = labelMap[entityType];
@@ -73,7 +110,22 @@ function createNERMappings(detectedEntities: any[]): { mappings: NERMappings; re
     locations: {},
     dates: {},
     ssn: {},
-    creditCards: {}
+    creditCards: {},
+    accountNumbers: {},
+    buildingNumbers: {},
+    cities: {},
+    datesOfBirth: {},
+    driverLicenses: {},
+    givenNames: {},
+    surnames: {},
+    idCards: {},
+    passwords: {},
+    socialNumbers: {},
+    streets: {},
+    taxNumbers: {},
+    telephoneNumbers: {},
+    usernames: {},
+    zipCodes: {}
   };
 
   // Count entities by type for generating unique labels
@@ -122,10 +174,12 @@ function createNERMappings(detectedEntities: any[]): { mappings: NERMappings; re
         break;
       case 'LOC':
       case 'STREET_ADDRESS':
-      case 'CITY':
       case 'STATE':
       case 'COUNTRY':
         mappings.locations[entityValue] = anonymizedValue;
+        break;
+      case 'CITY':
+        mappings.cities[entityValue] = anonymizedValue;
         break;
       case 'DATE':
         mappings.dates[entityValue] = anonymizedValue;
@@ -134,7 +188,50 @@ function createNERMappings(detectedEntities: any[]): { mappings: NERMappings; re
         mappings.ssn[entityValue] = anonymizedValue;
         break;
       case 'CREDIT_CARD':
+      case 'CREDITCARDNUMBER':
         mappings.creditCards[entityValue] = anonymizedValue;
+        break;
+      case 'ACCOUNTNUM':
+        mappings.accountNumbers[entityValue] = anonymizedValue;
+        break;
+      case 'BUILDINGNUM':
+        mappings.buildingNumbers[entityValue] = anonymizedValue;
+        break;
+      case 'DATEOFBIRTH':
+        mappings.datesOfBirth[entityValue] = anonymizedValue;
+        break;
+      case 'DRIVERLICENSENUM':
+        mappings.driverLicenses[entityValue] = anonymizedValue;
+        break;
+      case 'GIVENNAME':
+        mappings.givenNames[entityValue] = anonymizedValue;
+        break;
+      case 'SURNAME':
+        mappings.surnames[entityValue] = anonymizedValue;
+        break;
+      case 'IDCARDNUM':
+        mappings.idCards[entityValue] = anonymizedValue;
+        break;
+      case 'PASSWORD':
+        mappings.passwords[entityValue] = anonymizedValue;
+        break;
+      case 'SOCIALNUM':
+        mappings.socialNumbers[entityValue] = anonymizedValue;
+        break;
+      case 'STREET':
+        mappings.streets[entityValue] = anonymizedValue;
+        break;
+      case 'TAXNUM':
+        mappings.taxNumbers[entityValue] = anonymizedValue;
+        break;
+      case 'TELEPHONENUM':
+        mappings.telephoneNumbers[entityValue] = anonymizedValue;
+        break;
+      case 'USERNAME':
+        mappings.usernames[entityValue] = anonymizedValue;
+        break;
+      case 'ZIPCODE':
+        mappings.zipCodes[entityValue] = anonymizedValue;
         break;
     }
   });
