@@ -11,7 +11,9 @@
     "dev:test": "ts-node test.ts",
     "server": "ts-node server.ts",
     "server:build": "npm run build && node dist/server.js",
-    "test:server": "ts-node test-server.ts"
+    "test:server": "ts-node test-server.ts",
+    "worker:dev": "wrangler dev worker.ts",
+    "worker:deploy": "wrangler deploy"
   },
   "dependencies": {
     "@huggingface/inference": "^4.13.2",
@@ -20,6 +22,7 @@
   "devDependencies": {
     "@types/node": "^24.10.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wrangler": "^3.0.0"
   }
 }
