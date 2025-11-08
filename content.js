@@ -1,7 +1,7 @@
 // Wait for the page to load
 let typingTimer;
 const TYPING_DELAY = 1000; // 1 second after user stops typing
-const WORKER_URL = 'https://your-worker.workers.dev/api/endpoint';
+const WORKER_URL = 'https://security-hf.karthik-rachamolla.workers.dev/';
 
 // Create visual indicator
 function createIndicator(text) {
@@ -17,9 +17,10 @@ function createIndicator(text) {
   }, 2000);
 }
 
-// Function to send data to Cloudflare Worker
-async function sendToWorker(text) {
+// Function to send data to Cloudflare Worker and get NER mappings
+async function sendToWorkerForNER(text) {
   try {
+    console.log('Sending text to Cloudflare Worker for NER analysis:', text);
     const response = await fetch(WORKER_URL, {
       method: 'POST',
       headers: {
@@ -27,17 +28,22 @@ async function sendToWorker(text) {
       },
       body: JSON.stringify({
         text: text,
+        action: 'ner_detection',
         timestamp: new Date().toISOString()
       })
     });
     
     if (response.ok) {
-      console.log('Successfully sent to worker');
+      const data = await response.json();
+      console.log('Received NER mappings from worker:', data);
+      return data; // Expected format: { persons: {...}, emails: {...}, ... }
     } else {
       console.error('Worker response error:', response.status);
+      return null;
     }
   } catch (error) {
     console.error('Error sending to worker:', error);
+    return null;
   }
 }
 
@@ -100,24 +106,29 @@ function setupListener() {
       clearTimeout(typingTimer);
       
       // Set a new timer
-      typingTimer = setTimeout(() => {
+      typingTimer = setTimeout(async () => {
         const text = getTextFromElement(e.target);
         console.log('User stopped typing:', text);
         if (text && text.trim()) {
-          let processedText = text.toUpperCase();
-          
           // Detect NER replacements if enabled
           if (settings.NER) {
-            const replacements = detectNERReplacements(processedText);
+            // Send text to Cloudflare Worker and get NER mappings
+            const workerMappings = await sendToWorkerForNER(text);
+            
+            // Update nerMappings if worker returned valid data
+            if (workerMappings && typeof workerMappings === 'object') {
+              nerMappings = workerMappings;
+              console.log('Updated nerMappings from worker:', nerMappings);
+            }
+            
+            const replacements = detectNERReplacements(text);
             updateAlertsUI(replacements);
+            addRedUnderlines(e.target, replacements);
             console.log('NER detected', replacements.length, 'potential replacements');
             if (replacements.length > 0) {
               createIndicator(`Found ${replacements.length} sensitive item(s) - Check alerts!`);
             }
           }
-          
-          setTextInElement(e.target, processedText);
-          //sendToWorker(processedText);
         }
       }, TYPING_DELAY);
     });
@@ -125,24 +136,29 @@ function setupListener() {
     // Also detect when user stops typing by pressing a key and releasing
     textarea.addEventListener('keyup', function(e) {
       clearTimeout(typingTimer);
-      typingTimer = setTimeout(() => {
+      typingTimer = setTimeout(async () => {
         const text = getTextFromElement(e.target);
         console.log('User stopped typing:', text);
         if (text && text.trim()) {
-          let processedText = text.toUpperCase();
-          
           // Detect NER replacements if enabled
           if (settings.NER) {
-            const replacements = detectNERReplacements(processedText);
+            // Send text to Cloudflare Worker and get NER mappings
+            const workerMappings = await sendToWorkerForNER(text);
+            
+            // Update nerMappings if worker returned valid data
+            if (workerMappings && typeof workerMappings === 'object') {
+              nerMappings = workerMappings;
+              console.log('Updated nerMappings from worker:', nerMappings);
+            }
+            
+            const replacements = detectNERReplacements(text);
             updateAlertsUI(replacements);
+            addRedUnderlines(e.target, replacements);
             console.log('NER detected', replacements.length, 'potential replacements');
             if (replacements.length > 0) {
               createIndicator(`Found ${replacements.length} sensitive item(s) - Check alerts!`);
             }
           }
-          
-          setTextInElement(e.target, processedText);
-          //sendToWorker(processedText);
         }
       }, TYPING_DELAY);
     });
@@ -153,24 +169,29 @@ function setupListener() {
     const observer = new MutationObserver((mutations) => {
       clearTimeout(typingTimer);
       
-      typingTimer = setTimeout(() => {
+      typingTimer = setTimeout(async () => {
         const text = getTextFromElement(promptArea);
         console.log('Text changed in prompt-area:', text);
         if (text && text.trim()) {
-          let processedText = text.toUpperCase();
-          
           // Detect NER replacements if enabled
           if (settings.NER) {
-            const replacements = detectNERReplacements(processedText);
+            // Send text to Cloudflare Worker and get NER mappings
+            const workerMappings = await sendToWorkerForNER(text);
+            
+            // Update nerMappings if worker returned valid data
+            if (workerMappings && typeof workerMappings === 'object') {
+              nerMappings = workerMappings;
+              console.log('Updated nerMappings from worker:', nerMappings);
+            }
+            
+            const replacements = detectNERReplacements(text);
             updateAlertsUI(replacements);
+            addRedUnderlines(promptArea, replacements);
             console.log('NER detected', replacements.length, 'potential replacements');
             if (replacements.length > 0) {
               createIndicator(`Found ${replacements.length} sensitive item(s) - Check alerts!`);
             }
           }
-          
-          setTextInElement(promptArea, processedText);
-          //sendToWorker(processedText);
         }
       }, TYPING_DELAY);
     });
@@ -192,57 +213,14 @@ setupListener();
 
 // Settings state
 const settings = {
-  NER: false,
+  NER: true,  // Enabled by default
   PE: false,
   TokenSave: false
 };
 
-// Mock NER mapping - maps original entities to fake/anonymized versions
-const nerMappings = {
-  persons: {
-    'John Doe': 'Person A',
-    'Jane Smith': 'Person B',
-    'Michael Johnson': 'Person C',
-    'Sarah Williams': 'Person D',
-    'David Brown': 'Person E'
-  },
-  emails: {
-    'john.doe@example.com': 'user1@anonymous.com',
-    'jane.smith@company.com': 'user2@anonymous.com',
-    'contact@business.com': 'contact@anonymous.com',
-    'support@service.com': 'support@anonymous.com'
-  },
-  phones: {
-    '+1-555-123-4567': '+1-XXX-XXX-0001',
-    '(555) 987-6543': '(XXX) XXX-0002',
-    '555-246-8101': 'XXX-XXX-0003'
-  },
-  organizations: {
-    'Acme Corporation': 'Company A',
-    'TechStart Inc': 'Company B',
-    'Global Solutions': 'Company C',
-    'Innovation Labs': 'Company D'
-  },
-  locations: {
-    '123 Main Street': '[Address Redacted]',
-    'New York': '[City Redacted]',
-    'California': '[State Redacted]',
-    'United States': '[Country Redacted]'
-  },
-  dates: {
-    '2024-01-15': '[Date Redacted]',
-    'January 15, 2024': '[Date Redacted]',
-    '01/15/2024': '[Date Redacted]'
-  },
-  ssn: {
-    '123-45-6789': 'XXX-XX-XXXX',
-    '987-65-4321': 'XXX-XX-XXXX'
-  },
-  creditCards: {
-    '4532-1234-5678-9012': 'XXXX-XXXX-XXXX-XXXX',
-    '5425-2334-3010-9903': 'XXXX-XXXX-XXXX-XXXX'
-  }
-};
+// NER mapping - will be populated by the response from Cloudflare Worker
+// Starts empty - only uses data from worker
+let nerMappings = {};
 
 // Function to apply NER anonymization
 function applyNER(text) {
@@ -266,6 +244,8 @@ function detectNERReplacements(text) {
   const detectedReplacements = [];
   const seenPairs = new Set(); // To avoid duplicate entries
   
+  console.log('Detecting NER replacements in text:', text);
+  
   // Check all mapped entities
   Object.keys(nerMappings).forEach(category => {
     Object.keys(nerMappings[category]).forEach(original => {
@@ -273,6 +253,7 @@ function detectNERReplacements(text) {
       const matches = text.match(regex);
       
       if (matches && matches.length > 0) {
+        console.log(`Found match for "${original}" in category "${category}":`, matches);
         // Create a unique key for this original text (case-insensitive)
         const uniqueKey = `${category}:${matches[0].toLowerCase()}`;
         
@@ -291,7 +272,214 @@ function detectNERReplacements(text) {
     });
   });
   
+  console.log('Total replacements detected:', detectedReplacements);
   return detectedReplacements;
+}
+
+// Function to add red underlines to sensitive text
+function addRedUnderlines(element, replacements) {
+  console.log('addRedUnderlines called with element:', element, 'replacements:', replacements);
+  
+  if (!element || replacements.length === 0) return;
+  
+  // Remove existing underlines first
+  removeRedUnderlines();
+  
+  // Determine the target element - try multiple approaches
+  let targetElement = null;
+  
+  if (element.isContentEditable) {
+    targetElement = element;
+    console.log('Using contentEditable element');
+  } else if (element.querySelector('p')) {
+    targetElement = element.querySelector('p');
+    console.log('Using <p> element');
+  } else if (element.value !== undefined) {
+    // For regular input/textarea elements, we can't add underlines
+    console.log('Cannot add underlines to input/textarea elements');
+    return;
+  } else {
+    // Try using the element itself if it has text content
+    targetElement = element;
+    console.log('Using element itself');
+  }
+  
+  if (!targetElement) {
+    console.log('No target element found');
+    return;
+  }
+  
+  const text = targetElement.textContent || targetElement.innerText;
+  if (!text) {
+    console.log('No text content found');
+    return;
+  }
+  
+  console.log('Target element text:', text);
+  
+  // Create a map of positions to highlight
+  const highlights = [];
+  replacements.forEach(rep => {
+    const regex = new RegExp(rep.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    let match;
+    const tempRegex = new RegExp(regex.source, regex.flags);
+    
+    while ((match = tempRegex.exec(text)) !== null) {
+      highlights.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        original: match[0],
+        replacement: rep.replacement,
+        category: rep.category
+      });
+    }
+  });
+  
+  // Sort highlights by start position
+  highlights.sort((a, b) => a.start - b.start);
+  
+  // Build new HTML with underlined spans
+  let newHTML = '';
+  let lastIndex = 0;
+  
+  highlights.forEach((highlight, index) => {
+    // Add text before highlight
+    newHTML += escapeHtml(text.substring(lastIndex, highlight.start));
+    
+    // Add highlighted text with underline
+    const uniqueId = `underline-${index}`;
+    newHTML += `<span class="ner-underline" data-id="${uniqueId}" data-original="${escapeHtml(highlight.original)}" data-replacement="${escapeHtml(highlight.replacement)}" data-category="${escapeHtml(highlight.category)}">${escapeHtml(highlight.original)}</span>`;
+    
+    lastIndex = highlight.end;
+  });
+  
+  // Add remaining text
+  newHTML += escapeHtml(text.substring(lastIndex));
+  
+  // Update the element
+  targetElement.innerHTML = newHTML;
+  
+  // Add event listeners to underlined spans
+  const underlinedSpans = targetElement.querySelectorAll('.ner-underline');
+  underlinedSpans.forEach(span => {
+    span.addEventListener('mouseenter', showReplacementPopup);
+    span.addEventListener('mouseleave', hideReplacementPopup);
+    span.addEventListener('click', applyInlineReplacement);
+  });
+}
+
+// Function to remove red underlines
+function removeRedUnderlines() {
+  const underlines = document.querySelectorAll('.ner-underline');
+  underlines.forEach(span => {
+    const text = span.textContent;
+    const textNode = document.createTextNode(text);
+    span.parentNode.replaceChild(textNode, span);
+  });
+  
+  // Remove any existing popups
+  const existingPopup = document.getElementById('ner-replacement-popup');
+  if (existingPopup) {
+    existingPopup.remove();
+  }
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Function to show replacement popup on hover
+function showReplacementPopup(event) {
+  const span = event.target;
+  const original = span.dataset.original;
+  const replacement = span.dataset.replacement;
+  const category = span.dataset.category;
+  
+  // Remove existing popup
+  hideReplacementPopup();
+  
+  // Create popup
+  const popup = document.createElement('div');
+  popup.id = 'ner-replacement-popup';
+  popup.className = 'ner-popup';
+  
+  popup.innerHTML = `
+    <div class="ner-popup-header">
+      <span class="ner-popup-category">${category}</span>
+    </div>
+    <div class="ner-popup-body">
+      <div class="ner-popup-original">
+        <strong>Found:</strong> ${escapeHtml(original)}
+      </div>
+      <div class="ner-popup-replacement">
+        <strong>Suggest:</strong> ${escapeHtml(replacement)}
+      </div>
+    </div>
+    <div class="ner-popup-footer">
+      <button class="ner-popup-btn">Replace</button>
+    </div>
+  `;
+  
+  document.body.appendChild(popup);
+  
+  // Position popup near the underlined text
+  const rect = span.getBoundingClientRect();
+  popup.style.left = rect.left + 'px';
+  popup.style.top = (rect.bottom + 5) + 'px';
+  
+  // Add click handler to replace button
+  const replaceBtn = popup.querySelector('.ner-popup-btn');
+  replaceBtn.addEventListener('click', () => {
+    applyInlineReplacement.call(span);
+  });
+}
+
+// Function to hide replacement popup
+function hideReplacementPopup() {
+  const popup = document.getElementById('ner-replacement-popup');
+  if (popup) {
+    popup.remove();
+  }
+}
+
+// Function to apply inline replacement when clicking underlined text or popup button
+function applyInlineReplacement(event) {
+  const span = event.target.classList.contains('ner-underline') ? event.target : this;
+  const original = span.dataset.original;
+  const replacement = span.dataset.replacement;
+  
+  // Get the parent element (textarea or contenteditable)
+  const textarea = document.getElementById('prompt-textarea');
+  const promptArea = document.getElementById('prompt-area');
+  const element = textarea || promptArea;
+  
+  if (!element) return;
+  
+  // Replace the text
+  const currentText = getTextFromElement(element);
+  const regex = new RegExp(original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  const newText = currentText.replace(regex, replacement);
+  
+  setTextInElement(element, newText);
+  
+  // Hide popup
+  hideReplacementPopup();
+  
+  // Show indicator
+  createIndicator(`Replaced: ${original}`);
+  
+  // Re-detect and update underlines
+  if (settings.NER) {
+    setTimeout(() => {
+      const text = getTextFromElement(element);
+      const replacements = detectNERReplacements(text);
+      updateAlertsUI(replacements);
+      addRedUnderlines(element, replacements);
+    }, 100);
+  }
 }
 
 // Function to update alerts in the UI
@@ -486,6 +674,7 @@ function createBottomRightInterface() {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.id = `toggle-${toggle.id}`;
+    checkbox.checked = settings[toggle.id];  // Set initial state from settings
 
     const slider = document.createElement('span');
     slider.className = 'toggle-slider';
@@ -513,24 +702,44 @@ function createBottomRightInterface() {
           if (textarea) {
             const currentText = getTextFromElement(textarea);
             if (currentText && currentText.trim()) {
-              const replacements = detectNERReplacements(currentText);
-              updateAlertsUI(replacements);
-              if (replacements.length > 0) {
-                createIndicator(`NER: Found ${replacements.length} sensitive item(s)`);
-              } else {
-                createIndicator('NER: No sensitive data detected');
-              }
+              // Send to worker and get updated mappings
+              (async () => {
+                const workerMappings = await sendToWorkerForNER(currentText);
+                if (workerMappings && typeof workerMappings === 'object') {
+                  nerMappings = workerMappings;
+                  console.log('Updated nerMappings from worker:', nerMappings);
+                }
+                
+                const replacements = detectNERReplacements(currentText);
+                updateAlertsUI(replacements);
+                addRedUnderlines(textarea, replacements);
+                if (replacements.length > 0) {
+                  createIndicator(`NER: Found ${replacements.length} sensitive item(s)`);
+                } else {
+                  createIndicator('NER: No sensitive data detected');
+                }
+              })();
             }
           } else if (promptArea) {
             const currentText = getTextFromElement(promptArea);
             if (currentText && currentText.trim()) {
-              const replacements = detectNERReplacements(currentText);
-              updateAlertsUI(replacements);
-              if (replacements.length > 0) {
-                createIndicator(`NER: Found ${replacements.length} sensitive item(s)`);
-              } else {
-                createIndicator('NER: No sensitive data detected');
-              }
+              // Send to worker and get updated mappings
+              (async () => {
+                const workerMappings = await sendToWorkerForNER(currentText);
+                if (workerMappings && typeof workerMappings === 'object') {
+                  nerMappings = workerMappings;
+                  console.log('Updated nerMappings from worker:', nerMappings);
+                }
+                
+                const replacements = detectNERReplacements(currentText);
+                updateAlertsUI(replacements);
+                addRedUnderlines(promptArea, replacements);
+                if (replacements.length > 0) {
+                  createIndicator(`NER: Found ${replacements.length} sensitive item(s)`);
+                } else {
+                  createIndicator('NER: No sensitive data detected');
+                }
+              })();
             }
           }
         }
@@ -556,6 +765,8 @@ function createBottomRightInterface() {
           if (alertsContent) {
             alertsContent.innerHTML = '<p class="empty-state">No alerts at this time.</p>';
           }
+          // Remove red underlines
+          removeRedUnderlines();
           createIndicator('NER: Detection disabled');
         }
         
@@ -598,7 +809,11 @@ function createBottomRightInterface() {
   let isOpen = false;
   toggleButton.addEventListener('click', () => {
     isOpen = !isOpen;
-    popup.style.display = isOpen ? 'block' : 'none';
+    if (isOpen) {
+      popup.classList.add('show');
+    } else {
+      popup.classList.remove('show');
+    }
   });
 
   // Assemble the interface
