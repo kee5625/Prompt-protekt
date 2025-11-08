@@ -9,7 +9,6 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 async function promptGemini(
-  apiKey: string,
   userPrompt: string
 ): Promise<string> {
   // Meta-prompt: Convert user's simple prompt into a structured LLM template
@@ -24,7 +23,11 @@ Create an optimized prompt template that:
 4. Can be reused with different LLMs
 
 Return ONLY the optimized prompt template, nothing else.`;
-
+  const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set.');
+  }
+  
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
 
   const requestBody = {
@@ -64,26 +67,22 @@ Return ONLY the optimized prompt template, nothing else.`;
 // ============================================
 
 async function runTest() {
-  const API_KEY = process.env.GEMINI_API_KEY;
 
-  if (!API_KEY) {
-    throw new Error('GEMINI_API_KEY environment variable is not set.');
-  }
-  
+
   console.log('🚀 Testing Prompt Engineering Function...\n');
 
   try {
     // Test 1: Simple request
     console.log('Test 1: Convert simple request to template');
     console.log('User Input: "write a blog post about AI"');
-    const template1 = await promptGemini(API_KEY, 'write a blog post about AI');
+    const template1 = await promptGemini( 'write a blog post about AI');
     console.log('✅ Generated Template:\n', template1);
     console.log('\n' + '='.repeat(80) + '\n');
 
     // Test 2: Code request
     console.log('Test 2: Convert coding request to template');
     console.log('User Input: "create a python function to sort a list"');
-    const template2 = await promptGemini(API_KEY, 'create a python function to sort a list');
+    const template2 = await promptGemini('create a python function to sort a list');
     console.log('✅ Generated Template:\n', template2);
     console.log('\n' + '='.repeat(80) + '\n');
 
