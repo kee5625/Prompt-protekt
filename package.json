@@ -1,0 +1,25 @@
+{
+  "name": "prompt-protekt",
+  "version": "1.0.0",
+  "description": "A short README describing how to reduce resource use by routing requests to the most appropriate model instance.",
+  "main": "token-save.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node token-save.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kee5625/Prompt-protekt.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kee5625/Prompt-protekt/issues"
+  },
+  "homepage": "https://github.com/kee5625/Prompt-protekt#readme",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "groq-sdk": "^0.34.0",
+    "zod": "^4.1.12"
+  }
+}
