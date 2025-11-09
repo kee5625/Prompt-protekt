@@ -441,6 +441,7 @@ function updateAlertsUI(replacements) {
   
   // Build the alerts list HTML (scrollable)
   let listHtml = '';
+  let globalIndex = 0; // Track global index across all categories
   
   Object.keys(groupedReplacements).forEach(category => {
     listHtml += `
@@ -453,16 +454,17 @@ function updateAlertsUI(replacements) {
       const countBadge = rep.count > 1 ? `<span class="count-badge">${rep.count}x</span>` : '';
       
       listHtml += `
-        <div class="alert-item" data-id="${uniqueId}">
+        <div class="alert-item" data-id="${uniqueId}" data-original="${escapeHtml(rep.original)}" data-replacement="${escapeHtml(rep.replacement)}">
           <div class="alert-content">
             <div class="alert-details">
               <div class="found-text">Found: <span class="found-value">${rep.original}</span>${countBadge}</div>
               <div class="replace-text">Replace with: <span class="replace-value">${rep.replacement}</span></div>
             </div>
-            <button class="replace-btn" data-index="${index}">Replace</button>
+            <button class="replace-btn" data-global-index="${globalIndex}">Replace</button>
           </div>
         </div>
       `;
+      globalIndex++; // Increment for next item
     });
     
     listHtml += '</div>';
@@ -495,6 +497,12 @@ function updateAlertsUI(replacements) {
       alertsList.innerHTML = '<p class="empty-state">All replacements applied!</p>';
       alertsFooter.style.display = 'none';
       
+      // Update badge count to 0
+      const alertsBadge = document.querySelector('.alert-count-badge');
+      if (alertsBadge) {
+        alertsBadge.textContent = '(0)';
+      }
+      
       // Reset button to normal state
       if (toggleButton) {
         toggleButton.innerHTML = '⚙️';
@@ -512,8 +520,14 @@ function updateAlertsUI(replacements) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const alertItem = btn.closest('.alert-item');
-      const index = parseInt(btn.dataset.index);
-      const replacement = replacements[index];
+      const globalIndex = parseInt(btn.dataset.globalIndex);
+      const replacement = replacements[globalIndex];
+      
+      if (!replacement) {
+        console.error('Replacement not found for index:', globalIndex);
+        return;
+      }
+      
       const count = replacement.count;
       
       // Replace ALL instances
@@ -528,6 +542,13 @@ function updateAlertsUI(replacements) {
         alertItem.remove();
         // Check if no more alerts
         const remainingAlerts = alertsList.querySelectorAll('.alert-item').length;
+        
+        // Update badge count
+        const alertsBadge = document.querySelector('.alert-count-badge');
+        if (alertsBadge) {
+          alertsBadge.textContent = `(${remainingAlerts})`;
+        }
+        
         if (remainingAlerts === 0) {
           alertsList.innerHTML = '<p class="empty-state">All replacements applied!</p>';
           if (alertsFooter) alertsFooter.style.display = 'none';
