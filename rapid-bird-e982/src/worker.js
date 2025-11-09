@@ -5,8 +5,49 @@
 
 import { GoogleGenAI } from "@google/genai";
 
+// Allowed origins
+const ALLOWED_ORIGINS = [
+  'https://chatgpt.com',
+  'https://chat.openai.com'
+];
+
+function getCorsHeaders(origin) {
+  // Check if the origin is allowed
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    return {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '86400',
+    };
+  }
+  return null;
+}
+
+
 export default {
   async fetch(request, env, ctx) {
+    const origin = request.headers.get('Origin');
+    const corsHeaders = getCorsHeaders(origin);
+
+    // Block if origin is not allowed
+    if (!corsHeaders) {
+      return new Response('Forbidden', { status: 403 });
+    }
+
+    // Handle preflight OPTIONS request
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
+    }
+
+    // Only allow POST requests
+    if (request.method !== 'POST') {
+      return new Response('Method not allowed', {
+        status: 405,
+        headers: corsHeaders
+      });
+    }
+
     const data = await request.json();
 
     let userPrompt = data.prompt || "return an empty string";
@@ -72,7 +113,10 @@ Return ONLY the filled 5C contract. Do not add preamble or explanations.`;
       }
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...corsHeaders
+      },
     });
   }
 }
