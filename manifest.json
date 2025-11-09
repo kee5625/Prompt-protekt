@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Typing Detector",
+  "version": "1.0",
+  "description": "Detects when user stops typing in prompt-textarea",
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://your-worker.workers.dev/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://*.openai.com/*",
+        "https://anthropic.com/*",
+        "https://claude.ai/*"
+      ],
+      "css": ["styles.css"],
+      "js": ["content.js"]
+    }
+  ]
+}

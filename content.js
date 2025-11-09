@@ -1,0 +1,1084 @@
+// Wait for the page to load
+let typingTimer;
+const TYPING_DELAY = 1000; // 1 second after user stops typing
+const NER_WORKER_URL = 'https://security-hf.karthik-rachamolla.workers.dev';
+const PE_WORKER_URL = 'https://rapid-bird-e982.samarth-edlabadkar.workers.dev';
+const TOKEN_SAVE_WORKER_URL = 'https://twilight-disk-4072.samarth-edlabadkar.workers.dev/';
+
+// Create visual indicator - Grammarly Style
+function createIndicator(text) {
+  const indicator = document.createElement('div');
+  indicator.id = 'typing-indicator';
+  
+  // Create icon span
+  const icon = document.createElement('span');
+  icon.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background: #10b981; color: white; border-radius: 50%; margin-right: 8px; font-size: 12px; font-weight: bold;';
+  icon.textContent = '✓';
+  
+  // Create text span
+  const textSpan = document.createElement('span');
+  textSpan.textContent = text;
+  
+  indicator.appendChild(icon);
+  indicator.appendChild(textSpan);
+  document.body.appendChild(indicator);
+  
+  // Remove after 2 seconds
+  setTimeout(() => {
+    indicator.style.opacity = '0';
+    setTimeout(() => indicator.remove(), 300);
+  }, 2000);
+}
+
+// Function to send data to Cloudflare Worker and get NER mappings
+async function sendToWorkerForNER(text) {
+  try {
+    console.log('Sending text to Cloudflare Worker for NER analysis:', text);
+    const response = await fetch(NER_WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: text,
+        action: 'ner_detection',
+        timestamp: new Date().toISOString()
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Received NER mappings from worker:', data);
+      return data; // Expected format: { persons: {...}, emails: {...}, ... }
+    } else {
+      console.error('Worker response error:', response.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error sending to worker:', error);
+    return null;
+  }
+}
+
+// Function to send data to PE (Prompt Engineering) Worker
+async function sendToWorkerForPE(text) {
+  try {
+    console.log('Sending text to Cloudflare Worker for PE analysis:', text);
+    const response = await fetch(PE_WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt : text
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Received PE response from worker:', data);
+      return data;
+    } else {
+      console.error('PE Worker response error:', response.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error sending to PE worker:', error);
+    return null;
+  }
+}
+
+// Function to send data to Token Save Worker
+async function sendToWorkerForTokenSave(text) {
+  try {
+    console.log('Sending text to Cloudflare Worker for Token Save analysis:', text);
+    const response = await fetch(TOKEN_SAVE_WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: text
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Received Token Save response from worker:', data);
+      return data;
+    } else {
+      console.error('Token Save Worker response error:', response.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error sending to Token Save worker:', error);
+    return null;
+  }
+}
+
+// Function to get text from an element
+function getTextFromElement(element) {
+  // Try multiple methods to get text
+  if (element.value !== undefined) {
+    return element.value;
+  }
+  if (element.textContent) {
+    return element.textContent;
+  }
+  if (element.innerText) {
+    return element.innerText;
+  }
+  // Check for contenteditable
+  if (element.isContentEditable) {
+    return element.textContent || element.innerText;
+  }
+  // Check for <p> tag inside
+  const pTag = element.querySelector('p');
+  if (pTag) {
+    return pTag.textContent || pTag.innerText;
+  }
+  return '';
+}
+
+// Function to set text in an element
+function setTextInElement(element, text) {
+  // Try multiple methods to set text
+  if (element.value !== undefined) {
+    element.value = text;
+    // Trigger input event to notify any listeners
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  } else if (element.isContentEditable) {
+    element.textContent = text;
+  } else {
+    // Check for <p> tag inside
+    const pTag = element.querySelector('p');
+    if (pTag) {
+      pTag.textContent = text;
+    } else {
+      element.textContent = text;
+    }
+  }
+}
+
+// Function to setup the listener
+function setupListener() {
+  // Try to find textarea, prompt-area div, and chat-input div
+  const textarea = document.getElementById('prompt-textarea');
+  const promptArea = document.getElementById('prompt-area');
+  const chatInput = document.querySelector('[data-testid="chat-input"]');
+  
+  if (textarea) {
+    console.log('Found prompt-textarea, setting up listener');
+    console.log('Element type:', textarea.tagName, 'isContentEditable:', textarea.isContentEditable);
+    
+    textarea.addEventListener('input', function(e) {
+      // Clear the previous timer
+      clearTimeout(typingTimer);
+      
+      // Set a new timer
+      typingTimer = setTimeout(async () => {
+        const text = getTextFromElement(e.target);
+        console.log('User stopped typing:', text);
+        if (text && text.trim()) {
+          // Detect NER replacements if enabled
+          if (settings.NER) {
+            // Send text to Cloudflare Worker and get NER mappings
+            const workerMappings = await sendToWorkerForNER(text);
+            
+            // Update nerMappings if worker returned valid data
+            if (workerMappings && typeof workerMappings === 'object') {
+              nerMappings = workerMappings;
+              console.log('Updated nerMappings from worker:', nerMappings);
+            }
+            
+            const replacements = detectNERReplacements(text);
+            updateAlertsUI(replacements);
+            console.log('NER detected', replacements.length, 'potential replacements');
+            if (replacements.length > 0) {
+              createIndicator(`Found ${replacements.length} sensitive item(s) - Check alerts!`);
+            }
+          }
+        }
+      }, TYPING_DELAY);
+    });
+    
+    // Also detect when user stops typing by pressing a key and releasing
+    textarea.addEventListener('keyup', function(e) {
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(async () => {
+        const text = getTextFromElement(e.target);
+        console.log('User stopped typing:', text);
+        if (text && text.trim()) {
+          // Detect NER replacements if enabled
+          if (settings.NER) {
+            // Send text to Cloudflare Worker and get NER mappings
+            const workerMappings = await sendToWorkerForNER(text);
+            
+            // Update nerMappings if worker returned valid data
+            if (workerMappings && typeof workerMappings === 'object') {
+              nerMappings = workerMappings;
+              console.log('Updated nerMappings from worker:', nerMappings);
+            }
+            
+            const replacements = detectNERReplacements(text);
+            updateAlertsUI(replacements);
+            console.log('NER detected', replacements.length, 'potential replacements');
+            if (replacements.length > 0) {
+              createIndicator(`Found ${replacements.length} sensitive item(s) - Check alerts!`);
+            }
+          }
+        }
+      }, TYPING_DELAY);
+    });
+  } else if (promptArea) {
+    console.log('Found prompt-area, setting up listener');
+    
+    // Use MutationObserver to watch for changes in the prompt-area
+    const observer = new MutationObserver((mutations) => {
+      clearTimeout(typingTimer);
+      
+      typingTimer = setTimeout(async () => {
+        const text = getTextFromElement(promptArea);
+        console.log('Text changed in prompt-area:', text);
+        if (text && text.trim()) {
+          // Detect NER replacements if enabled
+          if (settings.NER) {
+            // Send text to Cloudflare Worker and get NER mappings
+            const workerMappings = await sendToWorkerForNER(text);
+            
+            // Update nerMappings if worker returned valid data
+            if (workerMappings && typeof workerMappings === 'object') {
+              nerMappings = workerMappings;
+              console.log('Updated nerMappings from worker:', nerMappings);
+            }
+            
+            const replacements = detectNERReplacements(text);
+            updateAlertsUI(replacements);
+            console.log('NER detected', replacements.length, 'potential replacements');
+            if (replacements.length > 0) {
+              createIndicator(`Found ${replacements.length} sensitive item(s) - Check alerts!`);
+            }
+          }
+        }
+      }, TYPING_DELAY);
+    });
+    
+    // Start observing the prompt-area for changes
+    observer.observe(promptArea, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  } else if (chatInput) {
+    console.log('Found chat-input div, setting up listener');
+    
+    // Use MutationObserver to watch for changes in the chat-input div
+    const observer = new MutationObserver((mutations) => {
+      clearTimeout(typingTimer);
+      
+      typingTimer = setTimeout(async () => {
+        const text = getTextFromElement(chatInput);
+        console.log('Text changed in chat-input:', text);
+        if (text && text.trim()) {
+          // Detect NER replacements if enabled
+          if (settings.NER) {
+            // Send text to Cloudflare Worker and get NER mappings
+            const workerMappings = await sendToWorkerForNER(text);
+            
+            // Update nerMappings if worker returned valid data
+            if (workerMappings && typeof workerMappings === 'object') {
+              nerMappings = workerMappings;
+              console.log('Updated nerMappings from worker:', nerMappings);
+            }
+            
+            const replacements = detectNERReplacements(text);
+            updateAlertsUI(replacements);
+            console.log('NER detected', replacements.length, 'potential replacements');
+            if (replacements.length > 0) {
+              createIndicator(`Found ${replacements.length} sensitive item(s) - Check alerts!`);
+            }
+          }
+        }
+      }, TYPING_DELAY);
+    });
+    
+    // Start observing the chat-input for changes
+    observer.observe(chatInput, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  } else {
+    // If element not found, try again after a delay
+    setTimeout(setupListener, 1000);
+  }
+}
+
+// Start looking for the textarea
+setupListener();
+
+// Settings state
+const settings = {
+  NER: true,  // Enabled by default
+  PE: false,
+  TokenSave: false
+};
+
+// Login state
+let isLoggedIn = false;
+
+// Default NER mapping - can be updated by the response from Cloudflare Worker
+let nerMappings = {
+  persons: {
+    'John Doe': 'Person A',
+    'Jane Smith': 'Person B',
+    'Michael Johnson': 'Person C',
+    'Sarah Williams': 'Person D',
+    'David Brown': 'Person E'
+  },
+  emails: {
+    'john.doe@example.com': 'user1@anonymous.com',
+    'jane.smith@company.com': 'user2@anonymous.com',
+    'contact@business.com': 'contact@anonymous.com',
+    'support@service.com': 'support@anonymous.com'
+  },
+  phones: {
+    '+1-555-123-4567': '+1-XXX-XXX-0001',
+    '(555) 987-6543': '(XXX) XXX-0002',
+    '555-246-8101': 'XXX-XXX-0003'
+  },
+  organizations: {
+    'Acme Corporation': 'Company A',
+    'TechStart Inc': 'Company B',
+    'Global Solutions': 'Company C',
+    'Innovation Labs': 'Company D'
+  },
+  locations: {
+    '123 Main Street': '[Address Redacted]',
+    'New York': '[City Redacted]',
+    'California': '[State Redacted]',
+    'United States': '[Country Redacted]'
+  },
+  dates: {
+    '2024-01-15': '[Date Redacted]',
+    'January 15, 2024': '[Date Redacted]',
+    '01/15/2024': '[Date Redacted]'
+  },
+  ssn: {
+    '123-45-6789': 'XXX-XX-XXXX',
+    '987-65-4321': 'XXX-XX-XXXX'
+  },
+  creditCards: {
+    '4532-1234-5678-9012': 'XXXX-XXXX-XXXX-XXXX',
+    '5425-2334-3010-9903': 'XXXX-XXXX-XXXX-XXXX'
+  }
+};
+
+// Function to apply NER anonymization
+function applyNER(text) {
+  let anonymizedText = text;
+  
+  // Replace all mapped entities with their fake versions
+  Object.keys(nerMappings).forEach(category => {
+    Object.keys(nerMappings[category]).forEach(original => {
+      const fake = nerMappings[category][original];
+      // Use global replace with case-insensitive matching
+      const regex = new RegExp(original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      anonymizedText = anonymizedText.replace(regex, fake);
+    });
+  });
+  
+  return anonymizedText;
+}
+
+// Function to detect potential NER replacements without applying them
+function detectNERReplacements(text) {
+  const detectedReplacements = [];
+  const seenPairs = new Set(); // To avoid duplicate entries
+  
+  console.log('Detecting NER replacements in text:', text);
+  
+  // Check all mapped entities
+  Object.keys(nerMappings).forEach(category => {
+    Object.keys(nerMappings[category]).forEach(original => {
+      const regex = new RegExp(original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      const matches = text.match(regex);
+      
+      if (matches && matches.length > 0) {
+        console.log(`Found match for "${original}" in category "${category}":`, matches);
+        // Create a unique key for this original text (case-insensitive)
+        const uniqueKey = `${category}:${matches[0].toLowerCase()}`;
+        
+        // Only add if we haven't seen this exact match before
+        if (!seenPairs.has(uniqueKey)) {
+          seenPairs.add(uniqueKey);
+          detectedReplacements.push({
+            category: category,
+            original: matches[0], // Use the actual matched text (preserves case)
+            replacement: nerMappings[category][original],
+            count: matches.length, // Track how many instances found
+            applied: false
+          });
+        }
+      }
+    });
+  });
+  
+  console.log('Total replacements detected:', detectedReplacements);
+  return detectedReplacements;
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Function to update alerts in the UI
+function updateAlertsUI(replacements) {
+  const alertsList = document.querySelector('.alerts-list');
+  const alertsFooter = document.querySelector('.alerts-footer');
+  const toggleButton = document.getElementById('prompt-protekt-toggle');
+  const alertsBadge = document.querySelector('.alert-count-badge');
+  
+  if (!alertsList) return;
+  
+  // Update badge count
+  if (alertsBadge) {
+    alertsBadge.textContent = `(${replacements.length})`;
+  }
+  
+  if (replacements.length === 0) {
+    alertsList.innerHTML = '<p class="empty-state">No sensitive data detected.</p>';
+    if (alertsFooter) alertsFooter.style.display = 'none';
+    // Reset button to normal state (green settings cog)
+    if (toggleButton) {
+      toggleButton.innerHTML = '⚙️';
+      toggleButton.classList.remove('alert-mode');
+    }
+    return;
+  }
+  
+  // Change button to red alarm mode
+  if (toggleButton) {
+    toggleButton.innerHTML = '🚨';
+    toggleButton.classList.add('alert-mode');
+  }
+  
+  // Group replacements by category
+  const groupedReplacements = {};
+  replacements.forEach(rep => {
+    if (!groupedReplacements[rep.category]) {
+      groupedReplacements[rep.category] = [];
+    }
+    groupedReplacements[rep.category].push(rep);
+  });
+  
+  // Build the alerts list HTML (scrollable)
+  let listHtml = '';
+  let globalIndex = 0; // Track global index across all categories
+  
+  Object.keys(groupedReplacements).forEach(category => {
+    listHtml += `
+      <div class="category-section">
+        <h4 class="category-header">${category}</h4>
+    `;
+    
+    groupedReplacements[category].forEach((rep, index) => {
+      const uniqueId = `${category}-${index}`;
+      const countBadge = rep.count > 1 ? `<span class="count-badge">${rep.count}x</span>` : '';
+      
+      listHtml += `
+        <div class="alert-item" data-id="${uniqueId}" data-original="${escapeHtml(rep.original)}" data-replacement="${escapeHtml(rep.replacement)}">
+          <div class="alert-content">
+            <div class="alert-details">
+              <div class="found-text">Found: <span class="found-value">${rep.original}</span>${countBadge}</div>
+              <div class="replace-text">Replace with: <span class="replace-value">${rep.replacement}</span></div>
+            </div>
+            <button class="replace-btn" data-global-index="${globalIndex}">Replace</button>
+          </div>
+        </div>
+      `;
+      globalIndex++; // Increment for next item
+    });
+    
+    listHtml += '</div>';
+  });
+  
+  alertsList.innerHTML = listHtml;
+  
+  // Show and populate the fixed footer with Replace All button
+  if (alertsFooter) {
+    alertsFooter.style.display = 'block';
+    alertsFooter.innerHTML = `
+      <div class="replace-all-container">
+        <button class="replace-all-btn">Replace All Alerts</button>
+      </div>
+    `;
+  }
+  
+  // Add click handler to "Replace All" button
+  const replaceAllBtn = alertsFooter.querySelector('.replace-all-btn');
+  if (replaceAllBtn) {
+    replaceAllBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      
+      // Replace all items
+      replacements.forEach(rep => {
+        applyReplacementAll(rep.original, rep.replacement);
+      });
+      
+      // Clear all alerts
+      alertsList.innerHTML = '<p class="empty-state">All replacements applied!</p>';
+      alertsFooter.style.display = 'none';
+      
+      // Update badge count to 0
+      const alertsBadge = document.querySelector('.alert-count-badge');
+      if (alertsBadge) {
+        alertsBadge.textContent = '(0)';
+      }
+      
+      // Reset button to normal state
+      if (toggleButton) {
+        toggleButton.innerHTML = '⚙️';
+        toggleButton.classList.remove('alert-mode');
+      }
+      
+      // Show success indicator
+      createIndicator(`Applied all ${replacements.length} replacement(s)!`);
+    });
+  }
+  
+  // Add click handlers to individual replace buttons
+  const replaceButtons = alertsList.querySelectorAll('.replace-btn');
+  replaceButtons.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const alertItem = btn.closest('.alert-item');
+      const globalIndex = parseInt(btn.dataset.globalIndex);
+      const replacement = replacements[globalIndex];
+      
+      if (!replacement) {
+        console.error('Replacement not found for index:', globalIndex);
+        return;
+      }
+      
+      const count = replacement.count;
+      
+      // Replace ALL instances
+      applyReplacementAll(replacement.original, replacement.replacement);
+      
+      // Remove the alert item with success feedback
+      alertItem.classList.add('success');
+      btn.textContent = `✓ ${count > 1 ? count + ' instances' : 'Applied'}`;
+      btn.disabled = true;
+      
+      setTimeout(() => {
+        alertItem.remove();
+        // Check if no more alerts
+        const remainingAlerts = alertsList.querySelectorAll('.alert-item').length;
+        
+        // Update badge count
+        const alertsBadge = document.querySelector('.alert-count-badge');
+        if (alertsBadge) {
+          alertsBadge.textContent = `(${remainingAlerts})`;
+        }
+        
+        if (remainingAlerts === 0) {
+          alertsList.innerHTML = '<p class="empty-state">All replacements applied!</p>';
+          if (alertsFooter) alertsFooter.style.display = 'none';
+          // Reset button to normal state
+          const toggleButton = document.getElementById('prompt-protekt-toggle');
+          if (toggleButton) {
+            toggleButton.innerHTML = '⚙️';
+            toggleButton.classList.remove('alert-mode');
+          }
+        }
+      }, 1500);
+    });
+  });
+}
+
+// Function to apply a single replacement (all instances)
+function applyReplacementAll(original, replacement) {
+  const textarea = document.getElementById('prompt-textarea');
+  const promptArea = document.getElementById('prompt-area');
+  
+  const element = textarea || promptArea;
+  if (!element) return;
+  
+  const currentText = getTextFromElement(element);
+  const regex = new RegExp(original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  
+  // Count how many instances will be replaced
+  const matches = currentText.match(regex);
+  const count = matches ? matches.length : 0;
+  
+  // Replace all instances globally
+  const newText = currentText.replace(regex, replacement);
+  
+  setTextInElement(element, newText);
+  createIndicator(`Replaced ${count} instance(s) of "${original}"`);
+  console.log(`Replaced ${count} instance(s) of "${original}" with "${replacement}"`);
+}
+
+// Function to apply a single replacement (legacy - single instance)
+function applyReplacement(original, replacement) {
+  const textarea = document.getElementById('prompt-textarea');
+  const promptArea = document.getElementById('prompt-area');
+  
+  const element = textarea || promptArea;
+  if (!element) return;
+  
+  const currentText = getTextFromElement(element);
+  const regex = new RegExp(original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  const newText = currentText.replace(regex, replacement);
+  
+  setTextInElement(element, newText);
+  createIndicator(`Replaced: ${original}`);
+  console.log(`Replaced "${original}" with "${replacement}"`);
+}
+
+// Function to add entity to NER mapping dynamically
+function addToNERMapping(category, original, fake) {
+  if (!nerMappings[category]) {
+    nerMappings[category] = {};
+  }
+  nerMappings[category][original] = fake;
+  console.log(`Added to NER mapping: ${category} - "${original}" -> "${fake}"`);
+}
+
+// Function to show optimized text popup (auto-dismiss after 10 seconds)
+function showOptimizedTextPopup(answerText) {
+  // Remove any existing popup
+  const existingPopup = document.getElementById('optimized-text-popup');
+  if (existingPopup) {
+    existingPopup.remove();
+  }
+  
+  // Create popup overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'optimized-text-popup';
+  overlay.className = 'optimized-popup-overlay';
+  
+  // Create popup content
+  const popupContent = document.createElement('div');
+  popupContent.className = 'optimized-popup-content';
+  
+  // Header with title and close button
+  const header = document.createElement('div');
+  header.className = 'optimized-popup-header';
+  
+  const title = document.createElement('h3');
+  title.textContent = 'Efficient Answer';
+  title.className = 'optimized-popup-title';
+  
+  const closeBtn = document.createElement('button');
+  closeBtn.innerHTML = '✕';
+  closeBtn.className = 'optimized-popup-close';
+  closeBtn.addEventListener('click', () => {
+    overlay.remove();
+  });
+  
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+  
+  // Body with answer text
+  const body = document.createElement('div');
+  body.className = 'optimized-popup-body';
+  
+  const textArea = document.createElement('textarea');
+  textArea.className = 'optimized-popup-textarea';
+  textArea.value = answerText;
+  textArea.readOnly = false;
+  
+  // Auto-select text for easy copying
+  setTimeout(() => {
+    textArea.select();
+  }, 100);
+  
+  body.appendChild(textArea);
+  
+  // Footer with auto-close countdown
+  const footer = document.createElement('div');
+  footer.className = 'optimized-popup-footer';
+  
+  let countdown = 10;
+  const countdownText = document.createElement('p');
+  countdownText.textContent = `This popup will close in ${countdown} seconds...`;
+  countdownText.style.margin = '0';
+  countdownText.style.color = '#666';
+  countdownText.style.fontSize = '12px';
+  
+  footer.appendChild(countdownText);
+  
+  // Assemble popup
+  popupContent.appendChild(header);
+  popupContent.appendChild(body);
+  popupContent.appendChild(footer);
+  overlay.appendChild(popupContent);
+  
+  // Close on overlay click
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+    }
+  });
+  
+  // Add to document
+  document.body.appendChild(overlay);
+  
+  // Countdown timer
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    countdownText.textContent = `This popup will close in ${countdown} seconds...`;
+    
+    if (countdown <= 0) {
+      clearInterval(countdownInterval);
+      overlay.remove();
+    }
+  }, 1000);
+  
+  // Store interval ID on overlay so we can clear it if manually closed
+  overlay.dataset.intervalId = countdownInterval;
+  
+  // Clear interval when manually closed
+  closeBtn.addEventListener('click', () => {
+    clearInterval(countdownInterval);
+  });
+  
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      clearInterval(countdownInterval);
+    }
+  });
+}
+
+// Create bottom-right interface
+function createBottomRightInterface() {
+  // Main container (collapsed state - just the button)
+  const container = document.createElement('div');
+  container.id = 'prompt-protekt-container';
+
+  // Toggle button (always visible)
+  const toggleButton = document.createElement('button');
+  toggleButton.id = 'prompt-protekt-toggle';
+  toggleButton.innerHTML = '⚙️';
+
+  // Popup panel (hidden by default)
+  const popup = document.createElement('div');
+  popup.id = 'prompt-protekt-popup';
+
+  // Tab buttons container
+  const tabButtons = document.createElement('div');
+  tabButtons.className = 'tab-buttons';
+
+  // Alerts tab button with count badge
+  const alertsTabBtn = document.createElement('button');
+  alertsTabBtn.className = 'tab-button active';
+
+  const alertsText = document.createElement('span');
+  alertsText.textContent = 'Alerts ';
+
+  const alertsBadge = document.createElement('span');
+  alertsBadge.className = 'alert-count-badge';
+  alertsBadge.textContent = '(0)';
+
+  alertsTabBtn.appendChild(alertsText);
+  alertsTabBtn.appendChild(alertsBadge);
+
+  // Login tab button with badge
+  const loginTabBtn = document.createElement('button');
+  loginTabBtn.className = 'tab-button';
+
+  const loginText = document.createElement('span');
+  loginText.textContent = 'Login';
+
+  const unlockBadge = document.createElement('span');
+  unlockBadge.className = 'badge badge-secondary';
+  unlockBadge.textContent = '✨ Unlock more';
+
+  loginTabBtn.appendChild(loginText);
+  loginTabBtn.appendChild(unlockBadge);
+
+  tabButtons.appendChild(alertsTabBtn);
+  tabButtons.appendChild(loginTabBtn);
+
+  // Alerts content with scrollable list and fixed button
+  const alertsContent = document.createElement('div');
+  alertsContent.className = 'tab-content alerts active';
+
+  // Create scrollable alerts list container
+  const alertsList = document.createElement('div');
+  alertsList.className = 'alerts-list';
+  alertsList.innerHTML = '<p class="empty-state">No alerts at this time.</p>';
+
+  // Create fixed button container
+  const alertsFooter = document.createElement('div');
+  alertsFooter.className = 'alerts-footer';
+  alertsFooter.style.display = 'none'; // Hidden by default
+
+  alertsContent.appendChild(alertsList);
+  alertsContent.appendChild(alertsFooter);
+
+  // Login content
+  const loginContent = document.createElement('div');
+  loginContent.className = 'tab-content login-content';
+
+  // Create login form
+  const loginForm = document.createElement('div');
+  loginForm.className = 'login-form';
+
+  // Email/Username field
+  const emailContainer = document.createElement('div');
+  emailContainer.className = 'login-field-container';
+
+  const emailLabel = document.createElement('label');
+  emailLabel.textContent = 'Email';
+  emailLabel.className = 'login-label';
+  emailLabel.htmlFor = 'login-email';
+
+  const emailInput = document.createElement('input');
+  emailInput.type = 'email';
+  emailInput.id = 'login-email';
+  emailInput.className = 'login-input';
+  emailInput.placeholder = 'Enter your email';
+
+  emailContainer.appendChild(emailLabel);
+  emailContainer.appendChild(emailInput);
+
+  // Password field
+  const passwordContainer = document.createElement('div');
+  passwordContainer.className = 'login-field-container';
+
+  const passwordLabel = document.createElement('label');
+  passwordLabel.textContent = 'Password';
+  passwordLabel.className = 'login-label';
+  passwordLabel.htmlFor = 'login-password';
+
+  const passwordInput = document.createElement('input');
+  passwordInput.type = 'password';
+  passwordInput.id = 'login-password';
+  passwordInput.className = 'login-input';
+  passwordInput.placeholder = 'Enter your password';
+
+  passwordContainer.appendChild(passwordLabel);
+  passwordContainer.appendChild(passwordInput);
+
+  // User info display (shown after login)
+  const userInfoContainer = document.createElement('div');
+  userInfoContainer.className = 'user-info-container';
+  userInfoContainer.style.display = 'none'; // Hidden by default
+  
+  const userInfoText = document.createElement('p');
+  userInfoText.className = 'user-info-text';
+  userInfoText.innerHTML = '<strong>Logged in as:</strong> <span id="user-email-display"></span>';
+  
+  userInfoContainer.appendChild(userInfoText);
+
+  // Token Save/Upgrade button (hidden by default, shown after login)
+  const upgradeButton = document.createElement('button');
+  upgradeButton.innerHTML = '⬆️ Enhance Prompt';
+  upgradeButton.className = 'upgrade-button';
+  upgradeButton.style.display = 'none'; // Hidden by default
+  upgradeButton.addEventListener('click', async () => {
+    const textarea = document.getElementById('prompt-textarea');
+    const promptArea = document.getElementById('prompt-area');
+    const chatInput = document.querySelector('[data-testid="chat-input"]');
+
+    const element = textarea || promptArea || chatInput;
+
+    if (!element) {
+      createIndicator('No text field found');
+      return;
+    }
+
+    const currentText = getTextFromElement(element);
+    if (!currentText || !currentText.trim()) {
+      createIndicator('No text to optimize');
+      return;
+    }
+
+    // Close the modal/popup
+    popup.classList.remove('show');
+    isOpen = false;
+
+    // Show loading state
+    upgradeButton.disabled = true;
+    upgradeButton.innerHTML = '⏳ Processing...';
+    createIndicator('Optimizing prompt...');
+
+    try {
+      // Step 1: Token Save
+      const tokenResponse = await sendToWorkerForTokenSave(currentText);
+
+      if (tokenResponse) {
+        // Check use_resource_saver flag from response
+        const useResourceSaver = tokenResponse.use_resource_saver === true;
+
+        if (useResourceSaver) {
+          // Resource saver mode - show answer in popup
+          const answerText = tokenResponse.answer || 'No answer received';
+          showOptimizedTextPopup(answerText);
+          createIndicator('Token Save: Complete ');
+
+          // Reset button
+          upgradeButton.disabled = false;
+          upgradeButton.innerHTML = '⬆️ Enhance Prompt';
+        } else {
+          // Normal mode - proceed to Prompt Engineering
+          createIndicator('Token Save: Complete ');
+
+          // Step 2: Auto-activate Prompt Enhancement (use original text)
+          setTimeout(async () => {
+            createIndicator('Enhancing prompt...');
+            const peResponse = await sendToWorkerForPE(currentText);
+
+            if (peResponse) {
+              // Check for result field
+              if (peResponse.result) {
+                // Update with enhanced version from PE worker
+                setTextInElement(element, peResponse.result);
+                createIndicator('Prompt Enhancement: Complete ');
+              } else {
+                // Log response and still mark as complete, but no update
+                console.log('PE Response (no result field):', peResponse);
+                createIndicator('Prompt Enhancement: Complete (no changes)');
+              }
+            } else {
+              createIndicator('Prompt Enhancement: Failed');
+            }
+
+            // Reset button
+            upgradeButton.disabled = false;
+            upgradeButton.innerHTML = '⬆️ Enhance Prompt';
+          }, 500);
+        }
+      } else {
+        createIndicator('Token Save: Failed');
+        upgradeButton.disabled = false;
+        upgradeButton.innerHTML = '⬆️ Enhance Prompt';
+      }
+    } catch (error) {
+      console.error('Error in Token Save process:', error);
+      createIndicator('Optimization failed');
+      upgradeButton.disabled = false;
+      upgradeButton.innerHTML = '⬆️ Enhance Prompt';
+    }
+  });
+
+  // Login button
+  const loginButton = document.createElement('button');
+  loginButton.textContent = 'Login';
+  loginButton.className = 'login-button';
+  loginButton.addEventListener('click', () => {
+    // Handle logout
+    if (isLoggedIn) {
+      isLoggedIn = false;
+
+      // Hide upgrade button and user info
+      upgradeButton.style.display = 'none';
+      userInfoContainer.style.display = 'none';
+
+      // Show login fields again
+      emailContainer.style.display = 'block';
+      passwordContainer.style.display = 'block';
+
+      // Reset login form
+      loginButton.textContent = 'Login';
+      loginButton.className = 'login-button';
+      emailInput.value = '';
+      passwordInput.value = '';
+
+      createIndicator('Logged out successfully');
+      return;
+    }
+
+    // Handle login
+    const email = emailInput.value;
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      createIndicator('Please enter both email and password');
+      return;
+    }
+
+    // TODO: Implement actual login functionality with backend
+    // For now, simulate successful login
+    console.log('Login attempt:', { email, password: '***' });
+
+    // Simulate login success
+    isLoggedIn = true;
+
+    // Hide login fields
+    emailContainer.style.display = 'none';
+    passwordContainer.style.display = 'none';
+
+    // Show user info and upgrade button
+    const userEmailDisplay = document.getElementById('user-email-display');
+    if (userEmailDisplay) {
+      userEmailDisplay.textContent = email;
+    }
+    userInfoContainer.style.display = 'block';
+    upgradeButton.style.display = 'block';
+
+    // Update login button to logout
+    loginButton.textContent = 'Logout';
+    loginButton.className = 'login-button logout';
+
+    createIndicator('Login successful!');
+  });
+
+  loginForm.appendChild(emailContainer);
+  loginForm.appendChild(passwordContainer);
+  loginForm.appendChild(userInfoContainer);
+  loginForm.appendChild(loginButton);
+  loginForm.appendChild(upgradeButton);
+  loginContent.appendChild(loginForm);
+
+  // Tab switching functionality
+  alertsTabBtn.addEventListener('click', () => {
+    alertsTabBtn.classList.add('active');
+    loginTabBtn.classList.remove('active');
+    alertsContent.classList.add('active');
+    loginContent.classList.remove('active');
+  });
+
+  loginTabBtn.addEventListener('click', () => {
+    loginTabBtn.classList.add('active');
+    alertsTabBtn.classList.remove('active');
+    loginContent.classList.add('active');
+    alertsContent.classList.remove('active');
+  });
+
+  // Toggle popup visibility with dynamic positioning
+  let isOpen = false;
+  toggleButton.addEventListener('click', () => {
+    isOpen = !isOpen;
+    if (isOpen) {
+      // Position popup above the buttons
+      const containerRect = container.getBoundingClientRect();
+      const popupHeight = Math.min(400, window.innerHeight - 140); // Estimated max height
+      popup.style.bottom = `${window.innerHeight - containerRect.top + 12}px`;
+      popup.classList.add('show');
+    } else {
+      popup.classList.remove('show');
+    }
+  });
+
+  // Assemble the interface - tabs at bottom
+  popup.appendChild(alertsContent);
+  popup.appendChild(loginContent);
+  popup.appendChild(tabButtons);
+  container.appendChild(toggleButton);
+  container.appendChild(popup);
+  document.body.appendChild(container);
+}
+
+// Initialize the interface when the page loads
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', createBottomRightInterface);
+} else {
+  createBottomRightInterface();
+}
