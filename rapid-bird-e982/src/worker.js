@@ -6,7 +6,6 @@
 import { GoogleGenAI } from "@google/genai";
 
 // Allowed origins
-
 function getCorsHeaders() {
   return {
     'Access-Control-Allow-Origin': "*",
@@ -21,14 +20,12 @@ export default {
   async fetch(request, env, ctx) {
     const corsHeaders = getCorsHeaders();
 
-    // Block if origin is not allowed
-    if (!corsHeaders) {
-      return new Response('Forbidden', { status: 403 });
-    }
-
     // Handle preflight OPTIONS request
     if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders
+      });
     }
 
     // Only allow POST requests
@@ -91,7 +88,7 @@ Return ONLY the filled 5C contract. Do not add preamble or explanations.`;
     if (!text) {
       return new Response(JSON.stringify({ error: 'No text generated in response' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
