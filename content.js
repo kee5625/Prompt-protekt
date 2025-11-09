@@ -1,9 +1,9 @@
 // Wait for the page to load
 let typingTimer;
 const TYPING_DELAY = 1000; // 1 second after user stops typing
-const NER_WORKER_URL = 'placeholder_for_ner_worker_url';
-const PE_WORKER_URL = 'placeholder_for_pe_worker_url';
-const TOKEN_SAVE_WORKER_URL = 'placeholder_for_token_save_worker_url';
+const NER_WORKER_URL = 'https://security-hf.karthik-rachamolla.workers.dev';
+const PE_WORKER_URL = 'https://rapid-bird-e982.samarth-edlabadkar.workers.dev';
+const TOKEN_SAVE_WORKER_URL = 'https://twilight-disk-4072.samarth-edlabadkar.workers.dev/';
 
 // Create visual indicator - Grammarly Style
 function createIndicator(text) {
@@ -70,9 +70,7 @@ async function sendToWorkerForPE(text) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        text: text,
-        action: 'prompt_engineering',
-        timestamp: new Date().toISOString()
+        prompt : text
       })
     });
     
@@ -100,9 +98,7 @@ async function sendToWorkerForTokenSave(text) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        text: text,
-        action: 'token_save',
-        timestamp: new Date().toISOString()
+        prompt: text
       })
     });
     
@@ -592,8 +588,8 @@ function addToNERMapping(category, original, fake) {
   console.log(`Added to NER mapping: ${category} - "${original}" -> "${fake}"`);
 }
 
-// Function to show optimized text popup
-function showOptimizedTextPopup(optimizedText) {
+// Function to show optimized text popup (auto-dismiss after 10 seconds)
+function showOptimizedTextPopup(answerText) {
   // Remove any existing popup
   const existingPopup = document.getElementById('optimized-text-popup');
   if (existingPopup) {
@@ -614,7 +610,7 @@ function showOptimizedTextPopup(optimizedText) {
   header.className = 'optimized-popup-header';
   
   const title = document.createElement('h3');
-  title.textContent = ' Optimized Text (Resource Saver Mode)';
+  title.textContent = '✨ Optimized Answer';
   title.className = 'optimized-popup-title';
   
   const closeBtn = document.createElement('button');
@@ -627,30 +623,40 @@ function showOptimizedTextPopup(optimizedText) {
   header.appendChild(title);
   header.appendChild(closeBtn);
   
-  // Body with optimized text
+  // Body with answer text
   const body = document.createElement('div');
   body.className = 'optimized-popup-body';
   
   const textArea = document.createElement('textarea');
   textArea.className = 'optimized-popup-textarea';
-  textArea.value = optimizedText;
+  textArea.value = answerText;
   textArea.readOnly = false;
+  
+  // Auto-select text for easy copying
+  setTimeout(() => {
+    textArea.select();
+  }, 100);
   
   body.appendChild(textArea);
   
-  // Footer with info
+  // Footer with auto-close countdown
   const footer = document.createElement('div');
   footer.className = 'optimized-popup-footer';
-  footer.innerHTML = '<p class="optimized-popup-info"> PE enhancement was skipped to save resources. You can copy this text or close this popup.</p>';
+  
+  let countdown = 10;
+  const countdownText = document.createElement('p');
+  countdownText.textContent = `This popup will close in ${countdown} seconds...`;
+  countdownText.style.margin = '0';
+  countdownText.style.color = '#666';
+  countdownText.style.fontSize = '12px';
+  
+  footer.appendChild(countdownText);
   
   // Assemble popup
   popupContent.appendChild(header);
   popupContent.appendChild(body);
   popupContent.appendChild(footer);
   overlay.appendChild(popupContent);
-  
-  // Add to body
-  document.body.appendChild(overlay);
   
   // Close on overlay click
   overlay.addEventListener('click', (e) => {
@@ -659,9 +665,33 @@ function showOptimizedTextPopup(optimizedText) {
     }
   });
   
-  // Select text for easy copying
-  textArea.focus();
-  textArea.select();
+  // Add to document
+  document.body.appendChild(overlay);
+  
+  // Countdown timer
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    countdownText.textContent = `This popup will close in ${countdown} seconds...`;
+    
+    if (countdown <= 0) {
+      clearInterval(countdownInterval);
+      overlay.remove();
+    }
+  }, 1000);
+  
+  // Store interval ID on overlay so we can clear it if manually closed
+  overlay.dataset.intervalId = countdownInterval;
+  
+  // Clear interval when manually closed
+  closeBtn.addEventListener('click', () => {
+    clearInterval(countdownInterval);
+  });
+  
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      clearInterval(countdownInterval);
+    }
+  });
 }
 
 // Create bottom-right interface
@@ -720,29 +750,30 @@ function createBottomRightInterface() {
       // Step 1: Token Save
       const tokenResponse = await sendToWorkerForTokenSave(currentText);
       
-      if (tokenResponse && tokenResponse.optimizedText) {
-        // Update the text with optimized version
-        setTextInElement(element, tokenResponse.optimizedText);
-        createIndicator('Token Save: Complete ✓');
-        
+      if (tokenResponse) {
         // Check use_resource_saver flag from response
         const useResourceSaver = tokenResponse.use_resource_saver === true;
         
         if (useResourceSaver) {
-          // Show popup with optimized text instead of proceeding to PE
-          showOptimizedTextPopup(tokenResponse.optimizedText);
+          // Resource saver mode - show answer in popup
+          const answerText = tokenResponse.answer || 'No answer received';
+          showOptimizedTextPopup(answerText);
+          createIndicator('Token Save: Complete ✓');
           
           // Reset button
           tokenSaveButton.disabled = false;
           tokenSaveButton.innerHTML = '⬆️';
         } else {
-          // Step 2: Auto-activate Prompt Enhancement (only if resource saver is false)
+          // Normal mode - proceed to Prompt Engineering
+          createIndicator('Token Save: Complete ✓');
+          
+          // Step 2: Auto-activate Prompt Enhancement (use original text)
           setTimeout(async () => {
             createIndicator('Enhancing prompt...');
-            const peResponse = await sendToWorkerForPE(tokenResponse.optimizedText);
+            const peResponse = await sendToWorkerForPE(currentText);
             
             if (peResponse && peResponse.enhancedText) {
-              // Update with enhanced version
+              // Update with enhanced version from PE worker
               setTextInElement(element, peResponse.enhancedText);
               createIndicator('Prompt Enhancement: Complete ✓');
             } else if (peResponse) {
@@ -757,13 +788,6 @@ function createBottomRightInterface() {
             tokenSaveButton.innerHTML = '⬆️';
           }, 500);
         }
-      } else if (tokenResponse) {
-        console.log('Token Save Response:', tokenResponse);
-        createIndicator('Token Save: Complete ✓');
-        
-        // Reset button
-        tokenSaveButton.disabled = false;
-        tokenSaveButton.innerHTML = '⬆️';
       } else {
         createIndicator('Token Save: Failed');
         tokenSaveButton.disabled = false;
