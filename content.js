@@ -799,10 +799,19 @@ function createBottomRightInterface() {
   alertsTabBtn.appendChild(alertsText);
   alertsTabBtn.appendChild(alertsBadge);
 
-  // Login tab button
+  // Login tab button with badge
   const loginTabBtn = document.createElement('button');
-  loginTabBtn.textContent = 'Login';
   loginTabBtn.className = 'tab-button';
+  
+  const loginText = document.createElement('span');
+  loginText.textContent = 'Login';
+  
+  const unlockBadge = document.createElement('span');
+  unlockBadge.className = 'badge badge-secondary';
+  unlockBadge.textContent = '✨ Unlock more';
+  
+  loginTabBtn.appendChild(loginText);
+  loginTabBtn.appendChild(unlockBadge);
 
   tabButtons.appendChild(alertsTabBtn);
   tabButtons.appendChild(loginTabBtn);
