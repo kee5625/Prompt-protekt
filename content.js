@@ -631,7 +631,7 @@ function showOptimizedTextPopup(answerText) {
   header.className = 'optimized-popup-header';
   
   const title = document.createElement('h3');
-  title.textContent = '✨ Optimized Answer';
+  title.textContent = 'Efficient Answer';
   title.className = 'optimized-popup-title';
   
   const closeBtn = document.createElement('button');
@@ -793,13 +793,17 @@ function createBottomRightInterface() {
             createIndicator('Enhancing prompt...');
             const peResponse = await sendToWorkerForPE(currentText);
             
-            if (peResponse && peResponse.enhancedText) {
-              // Update with enhanced version from PE worker
-              setTextInElement(element, peResponse.enhancedText);
-              createIndicator('Prompt Enhancement: Complete ✓');
-            } else if (peResponse) {
-              console.log('PE Response:', peResponse);
-              createIndicator('Prompt Enhancement: Complete ✓');
+            if (peResponse) {
+              // Check for result field
+              if (peResponse.result) {
+                // Update with enhanced version from PE worker
+                setTextInElement(element, peResponse.result);
+                createIndicator('Prompt Enhancement: Complete ✓');
+              } else {
+                // Log response and still mark as complete, but no update
+                console.log('PE Response (no result field):', peResponse);
+                createIndicator('Prompt Enhancement: Complete (no changes)');
+              }
             } else {
               createIndicator('Prompt Enhancement: Failed');
             }
