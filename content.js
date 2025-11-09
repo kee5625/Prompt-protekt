@@ -5,11 +5,22 @@ const NER_WORKER_URL = 'placeholder_for_ner_worker_url';
 const PE_WORKER_URL = 'placeholder_for_pe_worker_url';
 const TOKEN_SAVE_WORKER_URL = 'placeholder_for_token_save_worker_url';
 
-// Create visual indicator
+// Create visual indicator - Grammarly Style
 function createIndicator(text) {
   const indicator = document.createElement('div');
   indicator.id = 'typing-indicator';
-  indicator.textContent = `✓ ${text}`;
+  
+  // Create icon span
+  const icon = document.createElement('span');
+  icon.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background: #10b981; color: white; border-radius: 50%; margin-right: 8px; font-size: 12px; font-weight: bold;';
+  icon.textContent = '✓';
+  
+  // Create text span
+  const textSpan = document.createElement('span');
+  textSpan.textContent = text;
+  
+  indicator.appendChild(icon);
+  indicator.appendChild(textSpan);
   document.body.appendChild(indicator);
   
   // Remove after 2 seconds
@@ -900,11 +911,15 @@ function createBottomRightInterface() {
     alertsContent.classList.remove('active');
   });
 
-  // Toggle popup visibility
+  // Toggle popup visibility with dynamic positioning
   let isOpen = false;
   toggleButton.addEventListener('click', () => {
     isOpen = !isOpen;
     if (isOpen) {
+      // Position popup above the buttons
+      const containerRect = container.getBoundingClientRect();
+      const popupHeight = Math.min(400, window.innerHeight - 140); // Estimated max height
+      popup.style.bottom = `${window.innerHeight - containerRect.top + 12}px`;
       popup.classList.add('show');
     } else {
       popup.classList.remove('show');
