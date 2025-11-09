@@ -403,8 +403,14 @@ function escapeHtml(text) {
 function updateAlertsUI(replacements) {
   const alertsContent = document.querySelector('#prompt-protekt-popup .tab-content');
   const toggleButton = document.getElementById('prompt-protekt-toggle');
+  const alertsBadge = document.querySelector('.alert-count-badge');
   
   if (!alertsContent) return;
+  
+  // Update badge count
+  if (alertsBadge) {
+    alertsBadge.textContent = `(${replacements.length})`;
+  }
   
   if (replacements.length === 0) {
     alertsContent.innerHTML = '<p class="empty-state">No sensitive data detected.</p>';
@@ -773,10 +779,19 @@ function createBottomRightInterface() {
   const tabButtons = document.createElement('div');
   tabButtons.className = 'tab-buttons';
 
-  // Alerts tab button
+  // Alerts tab button with count badge
   const alertsTabBtn = document.createElement('button');
-  alertsTabBtn.textContent = 'Alerts';
   alertsTabBtn.className = 'tab-button active';
+  
+  const alertsText = document.createElement('span');
+  alertsText.textContent = 'Alerts ';
+  
+  const alertsBadge = document.createElement('span');
+  alertsBadge.className = 'alert-count-badge';
+  alertsBadge.textContent = '(0)';
+  
+  alertsTabBtn.appendChild(alertsText);
+  alertsTabBtn.appendChild(alertsBadge);
 
   // Login tab button
   const loginTabBtn = document.createElement('button');
@@ -926,10 +941,10 @@ function createBottomRightInterface() {
     }
   });
 
-  // Assemble the interface
-  popup.appendChild(tabButtons);
+  // Assemble the interface - tabs at bottom
   popup.appendChild(alertsContent);
   popup.appendChild(loginContent);
+  popup.appendChild(tabButtons);
   container.appendChild(toggleButton);
   container.appendChild(tokenSaveButton);
   container.appendChild(popup);

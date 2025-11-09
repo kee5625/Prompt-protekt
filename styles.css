@@ -301,13 +301,15 @@
   }
 }
 
-/* Tab Buttons Container - Dark Mode */
+/* Tab Buttons Container - Dark Mode at Bottom */
 #prompt-protekt-popup .tab-buttons {
   display: flex;
   background-color: #111827;
-  border-bottom: 1px solid #374151;
+  border-top: 1px solid #374151;
+  border-bottom: none;
   padding: 6px;
   gap: 6px;
+  border-radius: 0 0 12px 12px;
 }
 
 /* Tab Button - Dark Mode */
@@ -336,12 +338,25 @@
   color: #d1d5db;
 }
 
+/* Alert Count Badge */
+.alert-count-badge {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+.tab-button.active .alert-count-badge {
+  color: #6ee7b7;
+}
+
 /* Tab Content - Dark Mode */
 .tab-content {
   display: none;
   padding: 16px;
   color: #f9fafb;
   background: #1f2937;
+  border-radius: 12px 12px 0 0;
 }
 
 .tab-content.active {
