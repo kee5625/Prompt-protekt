@@ -1,7 +1,9 @@
 // Wait for the page to load
 let typingTimer;
 const TYPING_DELAY = 1000; // 1 second after user stops typing
-const WORKER_URL = 'https://security-hf.karthik-rachamolla.workers.dev/';
+const NER_WORKER_URL = 'placeholder_for_ner_worker_url';
+const PE_WORKER_URL = 'placeholder_for_pe_worker_url';
+const TOKEN_SAVE_WORKER_URL = 'placeholder_for_token_save_worker_url';
 
 // Create visual indicator
 function createIndicator(text) {
@@ -21,7 +23,7 @@ function createIndicator(text) {
 async function sendToWorkerForNER(text) {
   try {
     console.log('Sending text to Cloudflare Worker for NER analysis:', text);
-    const response = await fetch(WORKER_URL, {
+    const response = await fetch(NER_WORKER_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -43,6 +45,66 @@ async function sendToWorkerForNER(text) {
     }
   } catch (error) {
     console.error('Error sending to worker:', error);
+    return null;
+  }
+}
+
+// Function to send data to PE (Prompt Engineering) Worker
+async function sendToWorkerForPE(text) {
+  try {
+    console.log('Sending text to Cloudflare Worker for PE analysis:', text);
+    const response = await fetch(PE_WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: text,
+        action: 'prompt_engineering',
+        timestamp: new Date().toISOString()
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Received PE response from worker:', data);
+      return data;
+    } else {
+      console.error('PE Worker response error:', response.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error sending to PE worker:', error);
+    return null;
+  }
+}
+
+// Function to send data to Token Save Worker
+async function sendToWorkerForTokenSave(text) {
+  try {
+    console.log('Sending text to Cloudflare Worker for Token Save analysis:', text);
+    const response = await fetch(TOKEN_SAVE_WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: text,
+        action: 'token_save',
+        timestamp: new Date().toISOString()
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Received Token Save response from worker:', data);
+      return data;
+    } else {
+      console.error('Token Save Worker response error:', response.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error sending to Token Save worker:', error);
     return null;
   }
 }
@@ -123,7 +185,6 @@ function setupListener() {
             
             const replacements = detectNERReplacements(text);
             updateAlertsUI(replacements);
-            addRedUnderlines(e.target, replacements);
             console.log('NER detected', replacements.length, 'potential replacements');
             if (replacements.length > 0) {
               createIndicator(`Found ${replacements.length} sensitive item(s) - Check alerts!`);
@@ -153,7 +214,6 @@ function setupListener() {
             
             const replacements = detectNERReplacements(text);
             updateAlertsUI(replacements);
-            addRedUnderlines(e.target, replacements);
             console.log('NER detected', replacements.length, 'potential replacements');
             if (replacements.length > 0) {
               createIndicator(`Found ${replacements.length} sensitive item(s) - Check alerts!`);
@@ -186,7 +246,6 @@ function setupListener() {
             
             const replacements = detectNERReplacements(text);
             updateAlertsUI(replacements);
-            addRedUnderlines(promptArea, replacements);
             console.log('NER detected', replacements.length, 'potential replacements');
             if (replacements.length > 0) {
               createIndicator(`Found ${replacements.length} sensitive item(s) - Check alerts!`);
@@ -218,9 +277,55 @@ const settings = {
   TokenSave: false
 };
 
-// NER mapping - will be populated by the response from Cloudflare Worker
-// Starts empty - only uses data from worker
-let nerMappings = {};
+// Login state
+let isLoggedIn = false;
+
+// Default NER mapping - can be updated by the response from Cloudflare Worker
+let nerMappings = {
+  persons: {
+    'John Doe': 'Person A',
+    'Jane Smith': 'Person B',
+    'Michael Johnson': 'Person C',
+    'Sarah Williams': 'Person D',
+    'David Brown': 'Person E'
+  },
+  emails: {
+    'john.doe@example.com': 'user1@anonymous.com',
+    'jane.smith@company.com': 'user2@anonymous.com',
+    'contact@business.com': 'contact@anonymous.com',
+    'support@service.com': 'support@anonymous.com'
+  },
+  phones: {
+    '+1-555-123-4567': '+1-XXX-XXX-0001',
+    '(555) 987-6543': '(XXX) XXX-0002',
+    '555-246-8101': 'XXX-XXX-0003'
+  },
+  organizations: {
+    'Acme Corporation': 'Company A',
+    'TechStart Inc': 'Company B',
+    'Global Solutions': 'Company C',
+    'Innovation Labs': 'Company D'
+  },
+  locations: {
+    '123 Main Street': '[Address Redacted]',
+    'New York': '[City Redacted]',
+    'California': '[State Redacted]',
+    'United States': '[Country Redacted]'
+  },
+  dates: {
+    '2024-01-15': '[Date Redacted]',
+    'January 15, 2024': '[Date Redacted]',
+    '01/15/2024': '[Date Redacted]'
+  },
+  ssn: {
+    '123-45-6789': 'XXX-XX-XXXX',
+    '987-65-4321': 'XXX-XX-XXXX'
+  },
+  creditCards: {
+    '4532-1234-5678-9012': 'XXXX-XXXX-XXXX-XXXX',
+    '5425-2334-3010-9903': 'XXXX-XXXX-XXXX-XXXX'
+  }
+};
 
 // Function to apply NER anonymization
 function applyNER(text) {
@@ -276,114 +381,6 @@ function detectNERReplacements(text) {
   return detectedReplacements;
 }
 
-// Function to add red underlines to sensitive text
-function addRedUnderlines(element, replacements) {
-  console.log('addRedUnderlines called with element:', element, 'replacements:', replacements);
-  
-  if (!element || replacements.length === 0) return;
-  
-  // Remove existing underlines first
-  removeRedUnderlines();
-  
-  // Determine the target element - try multiple approaches
-  let targetElement = null;
-  
-  if (element.isContentEditable) {
-    targetElement = element;
-    console.log('Using contentEditable element');
-  } else if (element.querySelector('p')) {
-    targetElement = element.querySelector('p');
-    console.log('Using <p> element');
-  } else if (element.value !== undefined) {
-    // For regular input/textarea elements, we can't add underlines
-    console.log('Cannot add underlines to input/textarea elements');
-    return;
-  } else {
-    // Try using the element itself if it has text content
-    targetElement = element;
-    console.log('Using element itself');
-  }
-  
-  if (!targetElement) {
-    console.log('No target element found');
-    return;
-  }
-  
-  const text = targetElement.textContent || targetElement.innerText;
-  if (!text) {
-    console.log('No text content found');
-    return;
-  }
-  
-  console.log('Target element text:', text);
-  
-  // Create a map of positions to highlight
-  const highlights = [];
-  replacements.forEach(rep => {
-    const regex = new RegExp(rep.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-    let match;
-    const tempRegex = new RegExp(regex.source, regex.flags);
-    
-    while ((match = tempRegex.exec(text)) !== null) {
-      highlights.push({
-        start: match.index,
-        end: match.index + match[0].length,
-        original: match[0],
-        replacement: rep.replacement,
-        category: rep.category
-      });
-    }
-  });
-  
-  // Sort highlights by start position
-  highlights.sort((a, b) => a.start - b.start);
-  
-  // Build new HTML with underlined spans
-  let newHTML = '';
-  let lastIndex = 0;
-  
-  highlights.forEach((highlight, index) => {
-    // Add text before highlight
-    newHTML += escapeHtml(text.substring(lastIndex, highlight.start));
-    
-    // Add highlighted text with underline
-    const uniqueId = `underline-${index}`;
-    newHTML += `<span class="ner-underline" data-id="${uniqueId}" data-original="${escapeHtml(highlight.original)}" data-replacement="${escapeHtml(highlight.replacement)}" data-category="${escapeHtml(highlight.category)}">${escapeHtml(highlight.original)}</span>`;
-    
-    lastIndex = highlight.end;
-  });
-  
-  // Add remaining text
-  newHTML += escapeHtml(text.substring(lastIndex));
-  
-  // Update the element
-  targetElement.innerHTML = newHTML;
-  
-  // Add event listeners to underlined spans
-  const underlinedSpans = targetElement.querySelectorAll('.ner-underline');
-  underlinedSpans.forEach(span => {
-    span.addEventListener('mouseenter', showReplacementPopup);
-    span.addEventListener('mouseleave', hideReplacementPopup);
-    span.addEventListener('click', applyInlineReplacement);
-  });
-}
-
-// Function to remove red underlines
-function removeRedUnderlines() {
-  const underlines = document.querySelectorAll('.ner-underline');
-  underlines.forEach(span => {
-    const text = span.textContent;
-    const textNode = document.createTextNode(text);
-    span.parentNode.replaceChild(textNode, span);
-  });
-  
-  // Remove any existing popups
-  const existingPopup = document.getElementById('ner-replacement-popup');
-  if (existingPopup) {
-    existingPopup.remove();
-  }
-}
-
 // Helper function to escape HTML
 function escapeHtml(text) {
   const div = document.createElement('div');
@@ -391,106 +388,27 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Function to show replacement popup on hover
-function showReplacementPopup(event) {
-  const span = event.target;
-  const original = span.dataset.original;
-  const replacement = span.dataset.replacement;
-  const category = span.dataset.category;
-  
-  // Remove existing popup
-  hideReplacementPopup();
-  
-  // Create popup
-  const popup = document.createElement('div');
-  popup.id = 'ner-replacement-popup';
-  popup.className = 'ner-popup';
-  
-  popup.innerHTML = `
-    <div class="ner-popup-header">
-      <span class="ner-popup-category">${category}</span>
-    </div>
-    <div class="ner-popup-body">
-      <div class="ner-popup-original">
-        <strong>Found:</strong> ${escapeHtml(original)}
-      </div>
-      <div class="ner-popup-replacement">
-        <strong>Suggest:</strong> ${escapeHtml(replacement)}
-      </div>
-    </div>
-    <div class="ner-popup-footer">
-      <button class="ner-popup-btn">Replace</button>
-    </div>
-  `;
-  
-  document.body.appendChild(popup);
-  
-  // Position popup near the underlined text
-  const rect = span.getBoundingClientRect();
-  popup.style.left = rect.left + 'px';
-  popup.style.top = (rect.bottom + 5) + 'px';
-  
-  // Add click handler to replace button
-  const replaceBtn = popup.querySelector('.ner-popup-btn');
-  replaceBtn.addEventListener('click', () => {
-    applyInlineReplacement.call(span);
-  });
-}
-
-// Function to hide replacement popup
-function hideReplacementPopup() {
-  const popup = document.getElementById('ner-replacement-popup');
-  if (popup) {
-    popup.remove();
-  }
-}
-
-// Function to apply inline replacement when clicking underlined text or popup button
-function applyInlineReplacement(event) {
-  const span = event.target.classList.contains('ner-underline') ? event.target : this;
-  const original = span.dataset.original;
-  const replacement = span.dataset.replacement;
-  
-  // Get the parent element (textarea or contenteditable)
-  const textarea = document.getElementById('prompt-textarea');
-  const promptArea = document.getElementById('prompt-area');
-  const element = textarea || promptArea;
-  
-  if (!element) return;
-  
-  // Replace the text
-  const currentText = getTextFromElement(element);
-  const regex = new RegExp(original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-  const newText = currentText.replace(regex, replacement);
-  
-  setTextInElement(element, newText);
-  
-  // Hide popup
-  hideReplacementPopup();
-  
-  // Show indicator
-  createIndicator(`Replaced: ${original}`);
-  
-  // Re-detect and update underlines
-  if (settings.NER) {
-    setTimeout(() => {
-      const text = getTextFromElement(element);
-      const replacements = detectNERReplacements(text);
-      updateAlertsUI(replacements);
-      addRedUnderlines(element, replacements);
-    }, 100);
-  }
-}
-
 // Function to update alerts in the UI
 function updateAlertsUI(replacements) {
   const alertsContent = document.querySelector('#prompt-protekt-popup .tab-content');
+  const toggleButton = document.getElementById('prompt-protekt-toggle');
   
   if (!alertsContent) return;
   
   if (replacements.length === 0) {
     alertsContent.innerHTML = '<p class="empty-state">No sensitive data detected.</p>';
+    // Reset button to normal state (green settings cog)
+    if (toggleButton) {
+      toggleButton.innerHTML = '⚙️';
+      toggleButton.classList.remove('alert-mode');
+    }
     return;
+  }
+  
+  // Change button to red alarm mode
+  if (toggleButton) {
+    toggleButton.innerHTML = '🚨';
+    toggleButton.classList.add('alert-mode');
   }
   
   // Group replacements by category
@@ -504,6 +422,13 @@ function updateAlertsUI(replacements) {
   
   // Build the alerts HTML
   let html = '<div>';
+  
+  // Add "Replace All" button at the top
+  html += `
+    <div class="replace-all-container">
+      <button class="replace-all-btn"> Replace All Alerts</button>
+    </div>
+  `;
   
   Object.keys(groupedReplacements).forEach(category => {
     html += `
@@ -522,7 +447,7 @@ function updateAlertsUI(replacements) {
               <div class="found-text">Found: <span class="found-value">${rep.original}</span>${countBadge}</div>
               <div class="replace-text">Replace with: <span class="replace-value">${rep.replacement}</span></div>
             </div>
-            <button class="replace-btn">Replace All</button>
+            <button class="replace-btn" data-index="${index}">Replace</button>
           </div>
         </div>
       `;
@@ -534,12 +459,38 @@ function updateAlertsUI(replacements) {
   html += '</div>';
   alertsContent.innerHTML = html;
   
-  // Add click handlers to replace buttons
+  // Add click handler to "Replace All" button
+  const replaceAllBtn = alertsContent.querySelector('.replace-all-btn');
+  if (replaceAllBtn) {
+    replaceAllBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      
+      // Replace all items
+      replacements.forEach(rep => {
+        applyReplacementAll(rep.original, rep.replacement);
+      });
+      
+      // Clear all alerts
+      alertsContent.innerHTML = '<p class="empty-state">All replacements applied!</p>';
+      
+      // Reset button to normal state
+      if (toggleButton) {
+        toggleButton.innerHTML = '⚙️';
+        toggleButton.classList.remove('alert-mode');
+      }
+      
+      // Show success indicator
+      createIndicator(`Applied all ${replacements.length} replacement(s)!`);
+    });
+  }
+  
+  // Add click handlers to individual replace buttons
   const replaceButtons = alertsContent.querySelectorAll('.replace-btn');
-  replaceButtons.forEach((btn, index) => {
+  replaceButtons.forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const alertItem = btn.closest('.alert-item');
+      const index = parseInt(btn.dataset.index);
       const replacement = replacements[index];
       const count = replacement.count;
       
@@ -554,8 +505,15 @@ function updateAlertsUI(replacements) {
       setTimeout(() => {
         alertItem.remove();
         // Check if no more alerts
-        if (alertsContent.querySelectorAll('.alert-item').length === 0) {
+        const remainingAlerts = alertsContent.querySelectorAll('.alert-item').length;
+        if (remainingAlerts === 0) {
           alertsContent.innerHTML = '<p class="empty-state">All replacements applied!</p>';
+          // Reset button to normal state
+          const toggleButton = document.getElementById('prompt-protekt-toggle');
+          if (toggleButton) {
+            toggleButton.innerHTML = '⚙️';
+            toggleButton.classList.remove('alert-mode');
+          }
         }
       }, 1500);
     });
@@ -611,6 +569,78 @@ function addToNERMapping(category, original, fake) {
   console.log(`Added to NER mapping: ${category} - "${original}" -> "${fake}"`);
 }
 
+// Function to show optimized text popup
+function showOptimizedTextPopup(optimizedText) {
+  // Remove any existing popup
+  const existingPopup = document.getElementById('optimized-text-popup');
+  if (existingPopup) {
+    existingPopup.remove();
+  }
+  
+  // Create popup overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'optimized-text-popup';
+  overlay.className = 'optimized-popup-overlay';
+  
+  // Create popup content
+  const popupContent = document.createElement('div');
+  popupContent.className = 'optimized-popup-content';
+  
+  // Header with title and close button
+  const header = document.createElement('div');
+  header.className = 'optimized-popup-header';
+  
+  const title = document.createElement('h3');
+  title.textContent = ' Optimized Text (Resource Saver Mode)';
+  title.className = 'optimized-popup-title';
+  
+  const closeBtn = document.createElement('button');
+  closeBtn.innerHTML = '✕';
+  closeBtn.className = 'optimized-popup-close';
+  closeBtn.addEventListener('click', () => {
+    overlay.remove();
+  });
+  
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+  
+  // Body with optimized text
+  const body = document.createElement('div');
+  body.className = 'optimized-popup-body';
+  
+  const textArea = document.createElement('textarea');
+  textArea.className = 'optimized-popup-textarea';
+  textArea.value = optimizedText;
+  textArea.readOnly = false;
+  
+  body.appendChild(textArea);
+  
+  // Footer with info
+  const footer = document.createElement('div');
+  footer.className = 'optimized-popup-footer';
+  footer.innerHTML = '<p class="optimized-popup-info"> PE enhancement was skipped to save resources. You can copy this text or close this popup.</p>';
+  
+  // Assemble popup
+  popupContent.appendChild(header);
+  popupContent.appendChild(body);
+  popupContent.appendChild(footer);
+  overlay.appendChild(popupContent);
+  
+  // Add to body
+  document.body.appendChild(overlay);
+  
+  // Close on overlay click
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+    }
+  });
+  
+  // Select text for easy copying
+  textArea.focus();
+  textArea.select();
+}
+
 // Create bottom-right interface
 function createBottomRightInterface() {
   // Main container (collapsed state - just the button)
@@ -621,6 +651,108 @@ function createBottomRightInterface() {
   const toggleButton = document.createElement('button');
   toggleButton.id = 'prompt-protekt-toggle';
   toggleButton.innerHTML = '⚙️';
+
+  // Token Save action button (always visible)
+  const tokenSaveButton = document.createElement('button');
+  tokenSaveButton.id = 'token-save-action-btn';
+  tokenSaveButton.innerHTML = '⬆️';
+  tokenSaveButton.title = 'Optimize & Enhance Prompt';
+  
+  // Initially disable if not logged in
+  if (!isLoggedIn) {
+    tokenSaveButton.disabled = true;
+    tokenSaveButton.classList.add('disabled');
+    tokenSaveButton.title = 'Login required to use this feature';
+  }
+  
+  // Token Save button click handler
+  tokenSaveButton.addEventListener('click', async () => {
+    // Check login status
+    if (!isLoggedIn) {
+      createIndicator('Please login to use this feature');
+      return;
+    }
+    
+    const textarea = document.getElementById('prompt-textarea');
+    const promptArea = document.getElementById('prompt-area');
+    const element = textarea || promptArea;
+    
+    if (!element) {
+      createIndicator('No text field found');
+      return;
+    }
+    
+    const currentText = getTextFromElement(element);
+    if (!currentText || !currentText.trim()) {
+      createIndicator('No text to optimize');
+      return;
+    }
+    
+    // Show loading state
+    tokenSaveButton.disabled = true;
+    tokenSaveButton.innerHTML = '⏳';
+    createIndicator('Optimizing prompt...');
+    
+    try {
+      // Step 1: Token Save
+      const tokenResponse = await sendToWorkerForTokenSave(currentText);
+      
+      if (tokenResponse && tokenResponse.optimizedText) {
+        // Update the text with optimized version
+        setTextInElement(element, tokenResponse.optimizedText);
+        createIndicator('Token Save: Complete ✓');
+        
+        // Check use_resource_saver flag from response
+        const useResourceSaver = tokenResponse.use_resource_saver === true;
+        
+        if (useResourceSaver) {
+          // Show popup with optimized text instead of proceeding to PE
+          showOptimizedTextPopup(tokenResponse.optimizedText);
+          
+          // Reset button
+          tokenSaveButton.disabled = false;
+          tokenSaveButton.innerHTML = '⬆️';
+        } else {
+          // Step 2: Auto-activate Prompt Enhancement (only if resource saver is false)
+          setTimeout(async () => {
+            createIndicator('Enhancing prompt...');
+            const peResponse = await sendToWorkerForPE(tokenResponse.optimizedText);
+            
+            if (peResponse && peResponse.enhancedText) {
+              // Update with enhanced version
+              setTextInElement(element, peResponse.enhancedText);
+              createIndicator('Prompt Enhancement: Complete ✓');
+            } else if (peResponse) {
+              console.log('PE Response:', peResponse);
+              createIndicator('Prompt Enhancement: Complete ✓');
+            } else {
+              createIndicator('Prompt Enhancement: Failed');
+            }
+            
+            // Reset button
+            tokenSaveButton.disabled = false;
+            tokenSaveButton.innerHTML = '⬆️';
+          }, 500);
+        }
+      } else if (tokenResponse) {
+        console.log('Token Save Response:', tokenResponse);
+        createIndicator('Token Save: Complete ✓');
+        
+        // Reset button
+        tokenSaveButton.disabled = false;
+        tokenSaveButton.innerHTML = '⬆️';
+      } else {
+        createIndicator('Token Save: Failed');
+        tokenSaveButton.disabled = false;
+        tokenSaveButton.innerHTML = '⬆️';
+      }
+    } catch (error) {
+      console.error('Error in Token Save process:', error);
+      createIndicator('Optimization failed');
+      tokenSaveButton.disabled = false;
+      tokenSaveButton.innerHTML = '⬆️';
+    }
+  });
 
   // Popup panel (hidden by default)
   const popup = document.createElement('div');
@@ -635,173 +767,136 @@ function createBottomRightInterface() {
   alertsTabBtn.textContent = 'Alerts';
   alertsTabBtn.className = 'tab-button active';
 
-  // Settings tab button
-  const settingsTabBtn = document.createElement('button');
-  settingsTabBtn.textContent = 'Settings';
-  settingsTabBtn.className = 'tab-button';
+  // Login tab button
+  const loginTabBtn = document.createElement('button');
+  loginTabBtn.textContent = 'Login';
+  loginTabBtn.className = 'tab-button';
 
   tabButtons.appendChild(alertsTabBtn);
-  tabButtons.appendChild(settingsTabBtn);
+  tabButtons.appendChild(loginTabBtn);
 
   // Alerts content
   const alertsContent = document.createElement('div');
   alertsContent.className = 'tab-content alerts active';
   alertsContent.innerHTML = '<p class="empty-state">No alerts at this time.</p>';
 
-  // Settings content
-  const settingsContent = document.createElement('div');
-  settingsContent.className = 'tab-content';
+  // Login content
+  const loginContent = document.createElement('div');
+  loginContent.className = 'tab-content login-content';
 
-  // Create toggle switches for settings
-  const toggles = [
-    { id: 'NER', label: 'NER' },
-    { id: 'PE', label: 'PE' },
-    { id: 'TokenSave', label: 'Token Save' }
-  ];
+  // Create login form
+  const loginForm = document.createElement('div');
+  loginForm.className = 'login-form';
 
-  toggles.forEach(toggle => {
-    const toggleContainer = document.createElement('div');
-    toggleContainer.className = 'toggle-container';
+  // Email/Username field
+  const emailContainer = document.createElement('div');
+  emailContainer.className = 'login-field-container';
+  
+  const emailLabel = document.createElement('label');
+  emailLabel.textContent = 'Email';
+  emailLabel.className = 'login-label';
+  emailLabel.htmlFor = 'login-email';
+  
+  const emailInput = document.createElement('input');
+  emailInput.type = 'email';
+  emailInput.id = 'login-email';
+  emailInput.className = 'login-input';
+  emailInput.placeholder = 'Enter your email';
+  
+  emailContainer.appendChild(emailLabel);
+  emailContainer.appendChild(emailInput);
 
-    const label = document.createElement('span');
-    label.textContent = toggle.label;
-    label.className = 'toggle-label';
+  // Password field
+  const passwordContainer = document.createElement('div');
+  passwordContainer.className = 'login-field-container';
+  
+  const passwordLabel = document.createElement('label');
+  passwordLabel.textContent = 'Password';
+  passwordLabel.className = 'login-label';
+  passwordLabel.htmlFor = 'login-password';
+  
+  const passwordInput = document.createElement('input');
+  passwordInput.type = 'password';
+  passwordInput.id = 'login-password';
+  passwordInput.className = 'login-input';
+  passwordInput.placeholder = 'Enter your password';
+  
+  passwordContainer.appendChild(passwordLabel);
+  passwordContainer.appendChild(passwordInput);
 
-    // Toggle switch
-    const toggleSwitch = document.createElement('label');
-    toggleSwitch.className = 'toggle-switch';
-
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.id = `toggle-${toggle.id}`;
-    checkbox.checked = settings[toggle.id];  // Set initial state from settings
-
-    const slider = document.createElement('span');
-    slider.className = 'toggle-slider';
-
-    const sliderButton = document.createElement('span');
-    sliderButton.className = 'toggle-slider-button';
-    slider.appendChild(sliderButton);
-
-    // Toggle functionality
-    checkbox.addEventListener('change', function() {
-      settings[toggle.id] = this.checked;
-      console.log(`${toggle.label} is now: ${this.checked ? 'ON' : 'OFF'}`);
+  // Login button
+  const loginButton = document.createElement('button');
+  loginButton.textContent = 'Login';
+  loginButton.className = 'login-button';
+  loginButton.addEventListener('click', () => {
+    // Handle logout
+    if (isLoggedIn) {
+      isLoggedIn = false;
       
-      if (this.checked) {
-        
-        // NER functionality - Named Entity Recognition/Anonymization
-        if (toggle.id === 'NER') {
-          console.log('NER functionality activated');
-          console.log('Current NER mappings:', nerMappings);
-          
-          // Detect NER replacements in any existing text in the textarea
-          const textarea = document.getElementById('prompt-textarea');
-          const promptArea = document.getElementById('prompt-area');
-          
-          if (textarea) {
-            const currentText = getTextFromElement(textarea);
-            if (currentText && currentText.trim()) {
-              // Send to worker and get updated mappings
-              (async () => {
-                const workerMappings = await sendToWorkerForNER(currentText);
-                if (workerMappings && typeof workerMappings === 'object') {
-                  nerMappings = workerMappings;
-                  console.log('Updated nerMappings from worker:', nerMappings);
-                }
-                
-                const replacements = detectNERReplacements(currentText);
-                updateAlertsUI(replacements);
-                addRedUnderlines(textarea, replacements);
-                if (replacements.length > 0) {
-                  createIndicator(`NER: Found ${replacements.length} sensitive item(s)`);
-                } else {
-                  createIndicator('NER: No sensitive data detected');
-                }
-              })();
-            }
-          } else if (promptArea) {
-            const currentText = getTextFromElement(promptArea);
-            if (currentText && currentText.trim()) {
-              // Send to worker and get updated mappings
-              (async () => {
-                const workerMappings = await sendToWorkerForNER(currentText);
-                if (workerMappings && typeof workerMappings === 'object') {
-                  nerMappings = workerMappings;
-                  console.log('Updated nerMappings from worker:', nerMappings);
-                }
-                
-                const replacements = detectNERReplacements(currentText);
-                updateAlertsUI(replacements);
-                addRedUnderlines(promptArea, replacements);
-                if (replacements.length > 0) {
-                  createIndicator(`NER: Found ${replacements.length} sensitive item(s)`);
-                } else {
-                  createIndicator('NER: No sensitive data detected');
-                }
-              })();
-            }
-          }
-        }
-        
-        // Placeholder for PE functionality
-        if (toggle.id === 'PE') {
-          console.log('PE functionality activated');
-          // TODO: Add PE logic here
-        }
-        
-        // Placeholder for Token Save functionality
-        if (toggle.id === 'TokenSave') {
-          console.log('Token Save functionality activated');
-          // TODO: Add Token Save logic here
-        }
-      } else {
-        
-        // Disable NER functionality
-        if (toggle.id === 'NER') {
-          console.log('NER functionality deactivated');
-          // Clear alerts when NER is disabled
-          const alertsContent = document.querySelector('#prompt-protekt-popup .tab-content');
-          if (alertsContent) {
-            alertsContent.innerHTML = '<p class="empty-state">No alerts at this time.</p>';
-          }
-          // Remove red underlines
-          removeRedUnderlines();
-          createIndicator('NER: Detection disabled');
-        }
-        
-        if (toggle.id === 'PE') {
-          console.log('PE functionality deactivated');
-          // TODO: Add logic to disable PE
-        }
-        
-        if (toggle.id === 'TokenSave') {
-          console.log('Token Save functionality deactivated');
-          // TODO: Add logic to disable Token Save
-        }
-      }
-    });
-
-    toggleSwitch.appendChild(checkbox);
-    toggleSwitch.appendChild(slider);
-
-    toggleContainer.appendChild(label);
-    toggleContainer.appendChild(toggleSwitch);
-    settingsContent.appendChild(toggleContainer);
+      // Disable Token Save button
+      tokenSaveButton.disabled = true;
+      tokenSaveButton.classList.add('disabled');
+      tokenSaveButton.title = 'Login required to use this feature';
+      
+      // Reset login form
+      loginButton.textContent = 'Login';
+      loginButton.className = 'login-button';
+      emailInput.disabled = false;
+      passwordInput.disabled = false;
+      emailInput.value = '';
+      passwordInput.value = '';
+      
+      createIndicator('Logged out successfully');
+      return;
+    }
+    
+    // Handle login
+    const email = emailInput.value;
+    const password = passwordInput.value;
+    
+    if (!email || !password) {
+      createIndicator('Please enter both email and password');
+      return;
+    }
+    
+    // TODO: Implement actual login functionality with backend
+    // For now, simulate successful login
+    console.log('Login attempt:', { email, password: '***' });
+    
+    // Simulate login success
+    isLoggedIn = true;
+    
+    // Enable Token Save button
+    tokenSaveButton.disabled = false;
+    tokenSaveButton.classList.remove('disabled');
+    tokenSaveButton.title = 'Optimize & Enhance Prompt';
+    
+    // Update login form to show logged in state
+    loginButton.textContent = 'Logout';
+    loginButton.className = 'login-button logout';
+    emailInput.disabled = true;
+    passwordInput.disabled = true;
+    
+    createIndicator('Login successful!');
   });
+
+  loginForm.appendChild(emailContainer);
+  loginForm.appendChild(passwordContainer);
+  loginForm.appendChild(loginButton);
+  loginContent.appendChild(loginForm);
 
   // Tab switching functionality
   alertsTabBtn.addEventListener('click', () => {
     alertsTabBtn.classList.add('active');
-    settingsTabBtn.classList.remove('active');
+    loginTabBtn.classList.remove('active');
     alertsContent.classList.add('active');
-    settingsContent.classList.remove('active');
+    loginContent.classList.remove('active');
   });
 
-  settingsTabBtn.addEventListener('click', () => {
-    settingsTabBtn.classList.add('active');
+  loginTabBtn.addEventListener('click', () => {
+    loginTabBtn.classList.add('active');
     alertsTabBtn.classList.remove('active');
-    settingsContent.classList.add('active');
+    loginContent.classList.add('active');
     alertsContent.classList.remove('active');
   });
 
@@ -819,8 +914,9 @@ function createBottomRightInterface() {
   // Assemble the interface
   popup.appendChild(tabButtons);
   popup.appendChild(alertsContent);
-  popup.appendChild(settingsContent);
+  popup.appendChild(loginContent);
   container.appendChild(toggleButton);
+  container.appendChild(tokenSaveButton);
   container.appendChild(popup);
   document.body.appendChild(container);
 }
