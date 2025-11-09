@@ -6,29 +6,20 @@
 import { GoogleGenAI } from "@google/genai";
 
 // Allowed origins
-const ALLOWED_ORIGINS = [
-  'https://chatgpt.com',
-  'https://chat.openai.com'
-];
 
-function getCorsHeaders(origin) {
-  // Check if the origin is allowed
-  if (ALLOWED_ORIGINS.includes(origin)) {
-    return {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Max-Age': '86400',
-    };
-  }
-  return null;
+function getCorsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': "*",
+    'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+  };
 }
 
 
 export default {
   async fetch(request, env, ctx) {
-    const origin = request.headers.get('Origin');
-    const corsHeaders = getCorsHeaders(origin);
+    const corsHeaders = getCorsHeaders();
 
     // Block if origin is not allowed
     if (!corsHeaders) {
