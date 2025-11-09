@@ -1,0 +1,16 @@
+{
+	"name": "small-hall-1c79",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev",
+		"start": "wrangler dev"
+	},
+	"devDependencies": {
+		"wrangler": "^4.46.0"
+	},
+	"dependencies": {
+		"@google/genai": "^1.29.0"
+	}
+}
