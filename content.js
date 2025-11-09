@@ -766,108 +766,6 @@ function createBottomRightInterface() {
   toggleButton.id = 'prompt-protekt-toggle';
   toggleButton.innerHTML = '⚙️';
 
-  // Token Save action button (always visible)
-  const tokenSaveButton = document.createElement('button');
-  tokenSaveButton.id = 'token-save-action-btn';
-  tokenSaveButton.innerHTML = '⬆️';
-  tokenSaveButton.title = 'Optimize & Enhance Prompt';
-  
-  // Initially disable if not logged in
-  if (!isLoggedIn) {
-    tokenSaveButton.disabled = true;
-    tokenSaveButton.classList.add('disabled');
-    tokenSaveButton.title = 'Login required to use this feature';
-  }
-  
-  // Token Save button click handler
-  tokenSaveButton.addEventListener('click', async () => {
-    // Check login status
-    if (!isLoggedIn) {
-      createIndicator('Please login to use this feature');
-      return;
-    }
-    
-    const textarea = document.getElementById('prompt-textarea');
-    const promptArea = document.getElementById('prompt-area');
-    const chatInput = document.querySelector('[data-testid="chat-input"]');
-    
-    const element = textarea || promptArea || chatInput;
-    
-    if (!element) {
-      createIndicator('No text field found');
-      return;
-    }
-    
-    const currentText = getTextFromElement(element);
-    if (!currentText || !currentText.trim()) {
-      createIndicator('No text to optimize');
-      return;
-    }
-    
-    // Show loading state
-    tokenSaveButton.disabled = true;
-    tokenSaveButton.innerHTML = '⏳';
-    createIndicator('Optimizing prompt...');
-    
-    try {
-      // Step 1: Token Save
-      const tokenResponse = await sendToWorkerForTokenSave(currentText);
-      
-      if (tokenResponse) {
-        // Check use_resource_saver flag from response
-        const useResourceSaver = tokenResponse.use_resource_saver === true;
-        
-        if (useResourceSaver) {
-          // Resource saver mode - show answer in popup
-          const answerText = tokenResponse.answer || 'No answer received';
-          showOptimizedTextPopup(answerText);
-          createIndicator('Token Save: Complete ✓');
-          
-          // Reset button
-          tokenSaveButton.disabled = false;
-          tokenSaveButton.innerHTML = '⬆️';
-        } else {
-          // Normal mode - proceed to Prompt Engineering
-          createIndicator('Token Save: Complete ✓');
-          
-          // Step 2: Auto-activate Prompt Enhancement (use original text)
-          setTimeout(async () => {
-            createIndicator('Enhancing prompt...');
-            const peResponse = await sendToWorkerForPE(currentText);
-            
-            if (peResponse) {
-              // Check for result field
-              if (peResponse.result) {
-                // Update with enhanced version from PE worker
-                setTextInElement(element, peResponse.result);
-                createIndicator('Prompt Enhancement: Complete ✓');
-              } else {
-                // Log response and still mark as complete, but no update
-                console.log('PE Response (no result field):', peResponse);
-                createIndicator('Prompt Enhancement: Complete (no changes)');
-              }
-            } else {
-              createIndicator('Prompt Enhancement: Failed');
-            }
-            
-            // Reset button
-            tokenSaveButton.disabled = false;
-            tokenSaveButton.innerHTML = '⬆️';
-          }, 500);
-        }
-      } else {
-        createIndicator('Token Save: Failed');
-        tokenSaveButton.disabled = false;
-        tokenSaveButton.innerHTML = '⬆️';
-      }
-    } catch (error) {
-      console.error('Error in Token Save process:', error);
-      createIndicator('Optimization failed');
-      tokenSaveButton.disabled = false;
-      tokenSaveButton.innerHTML = '⬆️';
-    }
-  });
-
   // Popup panel (hidden by default)
   const popup = document.createElement('div');
   popup.id = 'prompt-protekt-popup';
@@ -879,28 +777,28 @@ function createBottomRightInterface() {
   // Alerts tab button with count badge
   const alertsTabBtn = document.createElement('button');
   alertsTabBtn.className = 'tab-button active';
-  
+
   const alertsText = document.createElement('span');
   alertsText.textContent = 'Alerts ';
-  
+
   const alertsBadge = document.createElement('span');
   alertsBadge.className = 'alert-count-badge';
   alertsBadge.textContent = '(0)';
-  
+
   alertsTabBtn.appendChild(alertsText);
   alertsTabBtn.appendChild(alertsBadge);
 
   // Login tab button with badge
   const loginTabBtn = document.createElement('button');
   loginTabBtn.className = 'tab-button';
-  
+
   const loginText = document.createElement('span');
   loginText.textContent = 'Login';
-  
+
   const unlockBadge = document.createElement('span');
   unlockBadge.className = 'badge badge-secondary';
   unlockBadge.textContent = '✨ Unlock more';
-  
+
   loginTabBtn.appendChild(loginText);
   loginTabBtn.appendChild(unlockBadge);
 
@@ -910,17 +808,17 @@ function createBottomRightInterface() {
   // Alerts content with scrollable list and fixed button
   const alertsContent = document.createElement('div');
   alertsContent.className = 'tab-content alerts active';
-  
+
   // Create scrollable alerts list container
   const alertsList = document.createElement('div');
   alertsList.className = 'alerts-list';
   alertsList.innerHTML = '<p class="empty-state">No alerts at this time.</p>';
-  
+
   // Create fixed button container
   const alertsFooter = document.createElement('div');
   alertsFooter.className = 'alerts-footer';
   alertsFooter.style.display = 'none'; // Hidden by default
-  
+
   alertsContent.appendChild(alertsList);
   alertsContent.appendChild(alertsFooter);
 
@@ -935,38 +833,140 @@ function createBottomRightInterface() {
   // Email/Username field
   const emailContainer = document.createElement('div');
   emailContainer.className = 'login-field-container';
-  
+
   const emailLabel = document.createElement('label');
   emailLabel.textContent = 'Email';
   emailLabel.className = 'login-label';
   emailLabel.htmlFor = 'login-email';
-  
+
   const emailInput = document.createElement('input');
   emailInput.type = 'email';
   emailInput.id = 'login-email';
   emailInput.className = 'login-input';
   emailInput.placeholder = 'Enter your email';
-  
+
   emailContainer.appendChild(emailLabel);
   emailContainer.appendChild(emailInput);
 
   // Password field
   const passwordContainer = document.createElement('div');
   passwordContainer.className = 'login-field-container';
-  
+
   const passwordLabel = document.createElement('label');
   passwordLabel.textContent = 'Password';
   passwordLabel.className = 'login-label';
   passwordLabel.htmlFor = 'login-password';
-  
+
   const passwordInput = document.createElement('input');
   passwordInput.type = 'password';
   passwordInput.id = 'login-password';
   passwordInput.className = 'login-input';
   passwordInput.placeholder = 'Enter your password';
-  
+
   passwordContainer.appendChild(passwordLabel);
   passwordContainer.appendChild(passwordInput);
+
+  // User info display (shown after login)
+  const userInfoContainer = document.createElement('div');
+  userInfoContainer.className = 'user-info-container';
+  userInfoContainer.style.display = 'none'; // Hidden by default
+  
+  const userInfoText = document.createElement('p');
+  userInfoText.className = 'user-info-text';
+  userInfoText.innerHTML = '<strong>Logged in as:</strong> <span id="user-email-display"></span>';
+  
+  userInfoContainer.appendChild(userInfoText);
+
+  // Token Save/Upgrade button (hidden by default, shown after login)
+  const upgradeButton = document.createElement('button');
+  upgradeButton.innerHTML = '⬆️ Enhance Prompt';
+  upgradeButton.className = 'upgrade-button';
+  upgradeButton.style.display = 'none'; // Hidden by default
+  upgradeButton.addEventListener('click', async () => {
+    const textarea = document.getElementById('prompt-textarea');
+    const promptArea = document.getElementById('prompt-area');
+    const chatInput = document.querySelector('[data-testid="chat-input"]');
+
+    const element = textarea || promptArea || chatInput;
+
+    if (!element) {
+      createIndicator('No text field found');
+      return;
+    }
+
+    const currentText = getTextFromElement(element);
+    if (!currentText || !currentText.trim()) {
+      createIndicator('No text to optimize');
+      return;
+    }
+
+    // Close the modal/popup
+    popup.classList.remove('show');
+    isOpen = false;
+
+    // Show loading state
+    upgradeButton.disabled = true;
+    upgradeButton.innerHTML = '⏳ Processing...';
+    createIndicator('Optimizing prompt...');
+
+    try {
+      // Step 1: Token Save
+      const tokenResponse = await sendToWorkerForTokenSave(currentText);
+
+      if (tokenResponse) {
+        // Check use_resource_saver flag from response
+        const useResourceSaver = tokenResponse.use_resource_saver === true;
+
+        if (useResourceSaver) {
+          // Resource saver mode - show answer in popup
+          const answerText = tokenResponse.answer || 'No answer received';
+          showOptimizedTextPopup(answerText);
+          createIndicator('Token Save: Complete ');
+
+          // Reset button
+          upgradeButton.disabled = false;
+          upgradeButton.innerHTML = '⬆️ Enhance Prompt';
+        } else {
+          // Normal mode - proceed to Prompt Engineering
+          createIndicator('Token Save: Complete ');
+
+          // Step 2: Auto-activate Prompt Enhancement (use original text)
+          setTimeout(async () => {
+            createIndicator('Enhancing prompt...');
+            const peResponse = await sendToWorkerForPE(currentText);
+
+            if (peResponse) {
+              // Check for result field
+              if (peResponse.result) {
+                // Update with enhanced version from PE worker
+                setTextInElement(element, peResponse.result);
+                createIndicator('Prompt Enhancement: Complete ');
+              } else {
+                // Log response and still mark as complete, but no update
+                console.log('PE Response (no result field):', peResponse);
+                createIndicator('Prompt Enhancement: Complete (no changes)');
+              }
+            } else {
+              createIndicator('Prompt Enhancement: Failed');
+            }
+
+            // Reset button
+            upgradeButton.disabled = false;
+            upgradeButton.innerHTML = '⬆️ Enhance Prompt';
+          }, 500);
+        }
+      } else {
+        createIndicator('Token Save: Failed');
+        upgradeButton.disabled = false;
+        upgradeButton.innerHTML = '⬆️ Enhance Prompt';
+      }
+    } catch (error) {
+      console.error('Error in Token Save process:', error);
+      createIndicator('Optimization failed');
+      upgradeButton.disabled = false;
+      upgradeButton.innerHTML = '⬆️ Enhance Prompt';
+    }
+  });
 
   // Login button
   const loginButton = document.createElement('button');
@@ -976,57 +976,65 @@ function createBottomRightInterface() {
     // Handle logout
     if (isLoggedIn) {
       isLoggedIn = false;
-      
-      // Disable Token Save button
-      tokenSaveButton.disabled = true;
-      tokenSaveButton.classList.add('disabled');
-      tokenSaveButton.title = 'Login required to use this feature';
-      
+
+      // Hide upgrade button and user info
+      upgradeButton.style.display = 'none';
+      userInfoContainer.style.display = 'none';
+
+      // Show login fields again
+      emailContainer.style.display = 'block';
+      passwordContainer.style.display = 'block';
+
       // Reset login form
       loginButton.textContent = 'Login';
       loginButton.className = 'login-button';
-      emailInput.disabled = false;
-      passwordInput.disabled = false;
       emailInput.value = '';
       passwordInput.value = '';
-      
+
       createIndicator('Logged out successfully');
       return;
     }
-    
+
     // Handle login
     const email = emailInput.value;
     const password = passwordInput.value;
-    
+
     if (!email || !password) {
       createIndicator('Please enter both email and password');
       return;
     }
-    
+
     // TODO: Implement actual login functionality with backend
     // For now, simulate successful login
     console.log('Login attempt:', { email, password: '***' });
-    
+
     // Simulate login success
     isLoggedIn = true;
-    
-    // Enable Token Save button
-    tokenSaveButton.disabled = false;
-    tokenSaveButton.classList.remove('disabled');
-    tokenSaveButton.title = 'Optimize & Enhance Prompt';
-    
-    // Update login form to show logged in state
+
+    // Hide login fields
+    emailContainer.style.display = 'none';
+    passwordContainer.style.display = 'none';
+
+    // Show user info and upgrade button
+    const userEmailDisplay = document.getElementById('user-email-display');
+    if (userEmailDisplay) {
+      userEmailDisplay.textContent = email;
+    }
+    userInfoContainer.style.display = 'block';
+    upgradeButton.style.display = 'block';
+
+    // Update login button to logout
     loginButton.textContent = 'Logout';
     loginButton.className = 'login-button logout';
-    emailInput.disabled = true;
-    passwordInput.disabled = true;
-    
+
     createIndicator('Login successful!');
   });
 
   loginForm.appendChild(emailContainer);
   loginForm.appendChild(passwordContainer);
+  loginForm.appendChild(userInfoContainer);
   loginForm.appendChild(loginButton);
+  loginForm.appendChild(upgradeButton);
   loginContent.appendChild(loginForm);
 
   // Tab switching functionality
@@ -1064,7 +1072,6 @@ function createBottomRightInterface() {
   popup.appendChild(loginContent);
   popup.appendChild(tabButtons);
   container.appendChild(toggleButton);
-  container.appendChild(tokenSaveButton);
   container.appendChild(popup);
   document.body.appendChild(container);
 }
