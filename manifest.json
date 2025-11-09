@@ -14,7 +14,9 @@
       "matches": [
         "https://chat.openai.com/*",
         "https://chatgpt.com/*",
-        "https://*.openai.com/*"
+        "https://*.openai.com/*",
+        "https://anthropic.com/*",
+        "https://claude.ai/*"
       ],
       "css": ["styles.css"],
       "js": ["content.js"]

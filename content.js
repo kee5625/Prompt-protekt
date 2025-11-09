@@ -162,9 +162,10 @@ function setTextInElement(element, text) {
 
 // Function to setup the listener
 function setupListener() {
-  // Try to find both textarea and the prompt-area div
+  // Try to find textarea, prompt-area div, and chat-input div
   const textarea = document.getElementById('prompt-textarea');
   const promptArea = document.getElementById('prompt-area');
+  const chatInput = document.querySelector('[data-testid="chat-input"]');
   
   if (textarea) {
     console.log('Found prompt-textarea, setting up listener');
@@ -264,6 +265,45 @@ function setupListener() {
     
     // Start observing the prompt-area for changes
     observer.observe(promptArea, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  } else if (chatInput) {
+    console.log('Found chat-input div, setting up listener');
+    
+    // Use MutationObserver to watch for changes in the chat-input div
+    const observer = new MutationObserver((mutations) => {
+      clearTimeout(typingTimer);
+      
+      typingTimer = setTimeout(async () => {
+        const text = getTextFromElement(chatInput);
+        console.log('Text changed in chat-input:', text);
+        if (text && text.trim()) {
+          // Detect NER replacements if enabled
+          if (settings.NER) {
+            // Send text to Cloudflare Worker and get NER mappings
+            const workerMappings = await sendToWorkerForNER(text);
+            
+            // Update nerMappings if worker returned valid data
+            if (workerMappings && typeof workerMappings === 'object') {
+              nerMappings = workerMappings;
+              console.log('Updated nerMappings from worker:', nerMappings);
+            }
+            
+            const replacements = detectNERReplacements(text);
+            updateAlertsUI(replacements);
+            console.log('NER detected', replacements.length, 'potential replacements');
+            if (replacements.length > 0) {
+              createIndicator(`Found ${replacements.length} sensitive item(s) - Check alerts!`);
+            }
+          }
+        }
+      }, TYPING_DELAY);
+    });
+    
+    // Start observing the chat-input for changes
+    observer.observe(chatInput, {
       childList: true,
       subtree: true,
       characterData: true
@@ -749,7 +789,9 @@ function createBottomRightInterface() {
     
     const textarea = document.getElementById('prompt-textarea');
     const promptArea = document.getElementById('prompt-area');
-    const element = textarea || promptArea;
+    const chatInput = document.querySelector('[data-testid="chat-input"]');
+    
+    const element = textarea || promptArea || chatInput;
     
     if (!element) {
       createIndicator('No text field found');
