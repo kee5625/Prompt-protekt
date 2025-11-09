@@ -1,0 +1,21 @@
+{
+	"name": "twilight-disk-4072",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev",
+		"start": "wrangler dev"
+	},
+	"devDependencies": {
+		"wrangler": "^4.46.0"
+	},
+	"dependencies": {
+		"crypto": "^1.0.1",
+		"dotenv": "^17.2.3",
+		"groq-sdk": "^0.34.0",
+		"os": "^0.1.2",
+		"path": "^0.12.7",
+		"zod": "^4.1.12"
+	}
+}
