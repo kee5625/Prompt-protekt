@@ -419,124 +419,111 @@
   background: #6b7280;
 }
 
-/* Alert Item - Professional Dark Mode */
+/* Alert Item - shadcn-inspired Clean Design */
 .alert-item {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%);
-  border-left: 3px solid #ef4444;
-  padding: 14px;
-  margin-bottom: 12px;
-  border-radius: 10px;
-  cursor: pointer;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 0;
+  margin-bottom: 8px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-left: 3px solid #ef4444;
 }
 
 .alert-item:hover {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.08) 100%);
-  transform: translateX(-2px);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .alert-item .alert-content {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  gap: 16px;
 }
 
 .alert-item .alert-details {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
+/* Item Title (Found text) */
 .alert-item .found-text {
-  color: #fca5a5;
+  color: #f9fafb;
+  font-size: 14px;
   font-weight: 500;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 8px;
+  line-height: 1.4;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .alert-item .found-value {
   background: rgba(239, 68, 68, 0.15);
-  padding: 6px 10px;
-  border-radius: 6px;
   color: #fca5a5;
   font-weight: 600;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  font-size: 13px;
-  display: inline-block;
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-  word-break: break-all;
-}
-
-.alert-item .count-badge {
-  background: #ef4444;
-  color: white;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
   padding: 3px 8px;
-  border-radius: 10px;
-  font-size: 10px;
-  font-weight: 700;
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 4px;
+  display: inline-block;
 }
 
+/* Item Description (Replace text) */
 .alert-item .replace-text {
-  color: #9ca3af;
-  font-size: 11px;
-  margin-top: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 500;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .alert-item .replace-value {
-  background: rgba(16, 185, 129, 0.15);
   color: #6ee7b7;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 13px;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  display: inline-block;
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-  word-break: break-all;
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
 }
 
-/* Replace Button - Dark Mode */
+/* Count Badge */
+.count-badge {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+/* Replace Button - Red style matching Replace All */
 .replace-btn {
   background: #ef4444;
   color: white;
   border: none;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
   white-space: nowrap;
-  align-self: flex-start;
-  margin-top: 4px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
 }
 
 .replace-btn:hover {
   background: #dc2626;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(239, 68, 68, 0.5);
+  box-shadow: 0 3px 6px rgba(239, 68, 68, 0.4);
 }
 
 .replace-btn:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-  transform: none;
 }
 
 /* Replace All Container - Fixed at Bottom */
@@ -737,37 +724,39 @@
 
 .login-button {
   padding: 12px 20px;
-  background: #59ce68;
-  color: white;
-  border: none;
+  background: #374151;
+  color: #f9fafb;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   margin-top: 8px;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   letter-spacing: -0.01em;
 }
 
 .login-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.5);
-  background: #7c3aed;
+  background: #4b5563;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .login-button:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.4);
+  transform: scale(0.98);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .login-button.logout {
   background: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
 }
 
 .login-button.logout:hover {
   background: #dc2626;
+  border-color: rgba(239, 68, 68, 0.4);
   box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
 }
 
