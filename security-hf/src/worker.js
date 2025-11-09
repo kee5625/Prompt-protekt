@@ -84,20 +84,40 @@ function createMappings(entities) {
   console.log('Input entities:', JSON.stringify(entities));
 
   const result = {
-    persons: {},
+    names: {},
     emails: {},
     phones: {},
+    addresses: {},
+    ids: {},
+    credentials: {},
+    financialInfo: {},
   };
 
   const counters = {
+    // Names
     GIVENNAME: 0,
     SURNAME: 0,
-    PER: 0,
+    // Contact
     EMAIL: 0,
-    EMAILADDRESS: 0,
-    PHONE_NUM: 0,
     TELEPHONENUM: 0,
-    PHONENUMBER: 0
+    // Location
+    STREET: 0,
+    BUILDINGNUM: 0,
+    CITY: 0,
+    ZIPCODE: 0,
+    // IDs
+    SOCIALNUM: 0,
+    DRIVERLICENSENUM: 0,
+    IDCARDNUM: 0,
+    TAXNUM: 0,
+    // Credentials
+    USERNAME: 0,
+    PASSWORD: 0,
+    // Financial
+    ACCOUNTNUM: 0,
+    CREDITCARDNUMBER: 0,
+    // Other
+    DATEOFBIRTH: 0,
   };
 
   entities.forEach((entity, idx) => {
@@ -106,30 +126,126 @@ function createMappings(entities) {
     const value = entity.word.trim();
 
     // Skip if already mapped
-    if (result.persons[value] || result.emails[value] || result.phones[value]) {
+    if (Object.values(result).some(category => category[value])) {
       console.log(`Skipping duplicate value: ${value}`);
       return;
     }
 
+    let label;
+    let category;
+
     // Map entity types to categories
-    if (type === 'GIVENNAME' || type === 'SURNAME' || type === 'PER') {
-      const label = generateLabel('PER', counters.GIVENNAME + counters.SURNAME + counters.PER, value);
-      result.persons[value] = label;
-      counters[type]++;
-      console.log('Added person:', value, '->', label);
-    } else if (type === 'EMAIL' || type === 'EMAILADDRESS') {
-      const label = generateLabel('EMAIL', counters.EMAIL + counters.EMAILADDRESS, value);
-      result.emails[value] = label;
-      counters[type]++;
-      console.log('Added email:', value, '->', label);
-    } else if (type === 'PHONE_NUM' || type === 'TELEPHONENUM' || type === 'PHONENUMBER') {
-      const label = generateLabel('PHONE_NUM', counters.PHONE_NUM + counters.TELEPHONENUM + counters.PHONENUMBER, value);
-      result.phones[value] = label;
-      counters[type]++;
-      console.log('Added phone:', value, '->', label);
-    } else {
-      console.log('Unknown entity type:', type, '- skipping');
+    switch (type) {
+      // Names
+      case 'GIVENNAME':
+      case 'SURNAME':
+        label = `Person ${String.fromCharCode(65 + counters.GIVENNAME + counters.SURNAME)}`;
+        category = 'names';
+        break;
+
+      // Email
+      case 'EMAIL':
+        label = `user${counters.EMAIL + 1}@anonymous.com`;
+        category = 'emails';
+        break;
+
+      // Phone
+      case 'TELEPHONENUM':
+        label = value.startsWith('+')
+          ? `+1-XXX-XXX-${String(counters.TELEPHONENUM + 1).padStart(4, '0')}`
+          : `XXX-XXX-${String(counters.TELEPHONENUM + 1).padStart(4, '0')}`;
+        category = 'phones';
+        break;
+
+      // Sometimes SOCIALNUM is misclassified for phone numbers
+      case 'SOCIALNUM':
+        // Check if it looks like a phone number (contains dashes in phone format or starts with area code)
+        if (value.match(/^\d{3}-\d{3}-\d{4}$/) || value.match(/^\(\d{3}\)\s*\d{3}-\d{4}$/) || value.match(/^\+\d/)) {
+          label = value.startsWith('+')
+            ? `+1-XXX-XXX-${String(counters.SOCIALNUM + 1).padStart(4, '0')}`
+            : `XXX-XXX-${String(counters.SOCIALNUM + 1).padStart(4, '0')}`;
+          category = 'phones';
+        } else {
+          // Otherwise treat as SSN
+          label = `XXX-XX-${String(counters.SOCIALNUM + 1).padStart(4, '0')}`;
+          category = 'ids';
+        }
+        break;
+
+      // Address components
+      case 'STREET':
+        label = `[STREET_${counters.STREET + 1}]`;
+        category = 'addresses';
+        break;
+
+      case 'BUILDINGNUM':
+        label = `[BUILDING_${counters.BUILDINGNUM + 1}]`;
+        category = 'addresses';
+        break;
+
+      case 'CITY':
+        label = `[CITY_${counters.CITY + 1}]`;
+        category = 'addresses';
+        break;
+
+      case 'ZIPCODE':
+        label = `[ZIPCODE_${counters.ZIPCODE + 1}]`;
+        category = 'addresses';
+        break;
+
+      // Government IDs
+      case 'DRIVERLICENSENUM':
+        label = `[DL_${counters.DRIVERLICENSENUM + 1}]`;
+        category = 'ids';
+        break;
+
+      case 'IDCARDNUM':
+        label = `[ID_${counters.IDCARDNUM + 1}]`;
+        category = 'ids';
+        break;
+
+      case 'TAXNUM':
+        label = `[TAX_${counters.TAXNUM + 1}]`;
+        category = 'ids';
+        break;
+
+      // Credentials
+      case 'USERNAME':
+        label = `user${counters.USERNAME + 1}`;
+        category = 'credentials';
+        break;
+
+      case 'PASSWORD':
+        label = `[PASSWORD_${counters.PASSWORD + 1}]`;
+        category = 'credentials';
+        break;
+
+      // Financial
+      case 'ACCOUNTNUM':
+        label = `[ACCT_XXXX${String(counters.ACCOUNTNUM + 1).padStart(4, '0')}]`;
+        category = 'financialInfo';
+        break;
+
+      case 'CREDITCARDNUMBER':
+        label = `XXXX-XXXX-XXXX-${String(counters.CREDITCARDNUMBER + 1).padStart(4, '0')}`;
+        category = 'financialInfo';
+        break;
+
+      // Date of Birth
+      case 'DATEOFBIRTH':
+        label = `[DOB_${counters.DATEOFBIRTH + 1}]`;
+        category = 'ids';
+        break;
+
+      default:
+        console.log('Unknown entity type:', type, '- skipping');
+        return;
     }
+
+    // Add to result
+    result[category][value] = label;
+    counters[type]++;
+    console.log(`Added ${type}:`, value, '->', label, `(category: ${category})`);
   });
 
   // Remove empty categories
