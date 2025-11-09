@@ -401,11 +401,12 @@ function escapeHtml(text) {
 
 // Function to update alerts in the UI
 function updateAlertsUI(replacements) {
-  const alertsContent = document.querySelector('#prompt-protekt-popup .tab-content');
+  const alertsList = document.querySelector('.alerts-list');
+  const alertsFooter = document.querySelector('.alerts-footer');
   const toggleButton = document.getElementById('prompt-protekt-toggle');
   const alertsBadge = document.querySelector('.alert-count-badge');
   
-  if (!alertsContent) return;
+  if (!alertsList) return;
   
   // Update badge count
   if (alertsBadge) {
@@ -413,7 +414,8 @@ function updateAlertsUI(replacements) {
   }
   
   if (replacements.length === 0) {
-    alertsContent.innerHTML = '<p class="empty-state">No sensitive data detected.</p>';
+    alertsList.innerHTML = '<p class="empty-state">No sensitive data detected.</p>';
+    if (alertsFooter) alertsFooter.style.display = 'none';
     // Reset button to normal state (green settings cog)
     if (toggleButton) {
       toggleButton.innerHTML = '⚙️';
@@ -437,18 +439,11 @@ function updateAlertsUI(replacements) {
     groupedReplacements[rep.category].push(rep);
   });
   
-  // Build the alerts HTML
-  let html = '<div>';
-  
-  // Add "Replace All" button at the top
-  html += `
-    <div class="replace-all-container">
-      <button class="replace-all-btn"> Replace All Alerts</button>
-    </div>
-  `;
+  // Build the alerts list HTML (scrollable)
+  let listHtml = '';
   
   Object.keys(groupedReplacements).forEach(category => {
-    html += `
+    listHtml += `
       <div class="category-section">
         <h4 class="category-header">${category}</h4>
     `;
@@ -457,7 +452,7 @@ function updateAlertsUI(replacements) {
       const uniqueId = `${category}-${index}`;
       const countBadge = rep.count > 1 ? `<span class="count-badge">${rep.count}x</span>` : '';
       
-      html += `
+      listHtml += `
         <div class="alert-item" data-id="${uniqueId}">
           <div class="alert-content">
             <div class="alert-details">
@@ -470,14 +465,23 @@ function updateAlertsUI(replacements) {
       `;
     });
     
-    html += '</div>';
+    listHtml += '</div>';
   });
   
-  html += '</div>';
-  alertsContent.innerHTML = html;
+  alertsList.innerHTML = listHtml;
+  
+  // Show and populate the fixed footer with Replace All button
+  if (alertsFooter) {
+    alertsFooter.style.display = 'block';
+    alertsFooter.innerHTML = `
+      <div class="replace-all-container">
+        <button class="replace-all-btn">Replace All Alerts</button>
+      </div>
+    `;
+  }
   
   // Add click handler to "Replace All" button
-  const replaceAllBtn = alertsContent.querySelector('.replace-all-btn');
+  const replaceAllBtn = alertsFooter.querySelector('.replace-all-btn');
   if (replaceAllBtn) {
     replaceAllBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -488,7 +492,8 @@ function updateAlertsUI(replacements) {
       });
       
       // Clear all alerts
-      alertsContent.innerHTML = '<p class="empty-state">All replacements applied!</p>';
+      alertsList.innerHTML = '<p class="empty-state">All replacements applied!</p>';
+      alertsFooter.style.display = 'none';
       
       // Reset button to normal state
       if (toggleButton) {
@@ -502,7 +507,7 @@ function updateAlertsUI(replacements) {
   }
   
   // Add click handlers to individual replace buttons
-  const replaceButtons = alertsContent.querySelectorAll('.replace-btn');
+  const replaceButtons = alertsList.querySelectorAll('.replace-btn');
   replaceButtons.forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -522,9 +527,10 @@ function updateAlertsUI(replacements) {
       setTimeout(() => {
         alertItem.remove();
         // Check if no more alerts
-        const remainingAlerts = alertsContent.querySelectorAll('.alert-item').length;
+        const remainingAlerts = alertsList.querySelectorAll('.alert-item').length;
         if (remainingAlerts === 0) {
-          alertsContent.innerHTML = '<p class="empty-state">All replacements applied!</p>';
+          alertsList.innerHTML = '<p class="empty-state">All replacements applied!</p>';
+          if (alertsFooter) alertsFooter.style.display = 'none';
           // Reset button to normal state
           const toggleButton = document.getElementById('prompt-protekt-toggle');
           if (toggleButton) {
@@ -801,10 +807,22 @@ function createBottomRightInterface() {
   tabButtons.appendChild(alertsTabBtn);
   tabButtons.appendChild(loginTabBtn);
 
-  // Alerts content
+  // Alerts content with scrollable list and fixed button
   const alertsContent = document.createElement('div');
   alertsContent.className = 'tab-content alerts active';
-  alertsContent.innerHTML = '<p class="empty-state">No alerts at this time.</p>';
+  
+  // Create scrollable alerts list container
+  const alertsList = document.createElement('div');
+  alertsList.className = 'alerts-list';
+  alertsList.innerHTML = '<p class="empty-state">No alerts at this time.</p>';
+  
+  // Create fixed button container
+  const alertsFooter = document.createElement('div');
+  alertsFooter.className = 'alerts-footer';
+  alertsFooter.style.display = 'none'; // Hidden by default
+  
+  alertsContent.appendChild(alertsList);
+  alertsContent.appendChild(alertsFooter);
 
   // Login content
   const loginContent = document.createElement('div');
