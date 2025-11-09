@@ -11,6 +11,14 @@
 import Groq from "groq-sdk";
 import { z } from "zod";
 
+function getCorsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Max-Age': '86400',
+  };
+}
 
 const ResourceSaverSchema = z.object({
   use_resource_saver: z.boolean().describe("Whether to use the resource-save model (smaller, faster) or the full model"),
@@ -20,17 +28,47 @@ const ResourceSaverSchema = z.object({
 
 export default {
   async fetch(request, env, ctx) {
+    const corsHeaders = getCorsHeaders();
+
+    // Block if origin is not allowed
+    if (!corsHeaders) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Handle preflight OPTIONS request
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders
+      });
+    }
+
+    // Only allow POST requests
+    if (request.method !== 'POST') {
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        }
+      });
+    }
+
     const data = await request.json();
+
     const models = ["meta-llama/llama-4-scout-17b-16e-instruct", "meta-llama/llama-4-maverick-17b-128e-instruct"];
     let rval = Math.random() < 0.5 ? 0 : 1;
+
+    let prompt = data.prompt;
 
     console.log("GROQ_API_KEY:", env.GROQ_API_KEY);
 
     const groq = new Groq({
       apiKey: env.GROQ_API_KEY,
     });
-
-    let prompt = data.prompt;
 
     const response = await groq.chat.completions.create({
       model: models[rval],
@@ -70,6 +108,11 @@ export default {
     // console.log("Response:", response.choices[0].message.content);
     // You can view your logs in the Observability dashboard
     // console.info({ message: 'Hello World Worker received a request!' });
-    return new Response(response.choices[0].message.content);
+    return new Response(response.choices[0].message.content, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+      }
+    });
   }
 };
